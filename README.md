@@ -1,6 +1,6 @@
 # Stet Binary Distribution
 
-This private repository distributes Stet CLI binaries for MVP users. It does not contain Stet source code. Users need read access to this repository, but they do not need access to the private Stet source repository.
+This private repository distributes Stet CLI binaries and the Stet agent skill for MVP users. It does not contain Stet source code. Users need read access to this repository, but they do not need access to the private Stet source repository.
 
 Homebrew and `go install` are intentionally not used for MVP Stet distribution. Install Stet from the binary release assets in this private repository.
 
@@ -47,7 +47,33 @@ stet --version
 
 `stet --version` should print the Stet version, source commit, and build date.
 
-### 3. Install Docker
+### 3. Install The Stet Agent Skill
+
+The repo includes the Stet skill under `skills/stet`, following the Agent Skills `SKILL.md` directory format. Install it with the `npx skills` CLI:
+
+```sh
+npx skills add benredmond/stet-dist --skill stet
+```
+
+To install globally for Codex:
+
+```sh
+npx skills add benredmond/stet-dist --skill stet --global --agent codex --yes
+```
+
+To inspect the skill before installing:
+
+```sh
+npx skills add benredmond/stet-dist --list
+```
+
+If the GitHub shorthand cannot access the private repo in your environment, use the full GitHub URL:
+
+```sh
+npx skills add https://github.com/benredmond/stet-dist --skill stet
+```
+
+### 4. Install Docker
 
 Stet uses Docker-backed task environments for validation and benchmark runs. First check whether Docker is already installed and running:
 
@@ -88,7 +114,7 @@ If the user wants to run Docker without `sudo`, add them to the `docker` group a
 sudo usermod -aG docker "$USER"
 ```
 
-### 4. Install Harbor
+### 5. Install Harbor
 
 Stet's default harness command is Harbor. Harbor requires Python 3.12+ and Docker.
 
@@ -107,13 +133,14 @@ harbor --version
 
 If `harbor` is not found after install, add the `uv` tool bin directory to `PATH`. On many systems this is `$HOME/.local/bin`.
 
-### 5. Final Setup Check
+### 6. Final Setup Check
 
 Run these checks and fix any failure before starting real Stet work:
 
 ```sh
 gh auth status
 stet --version
+npx skills list
 docker info
 harbor --version
 ```
