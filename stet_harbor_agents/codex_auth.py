@@ -6,12 +6,12 @@ import shlex
 from base64 import b64encode
 from pathlib import Path
 
-from harbor.agents.installed.base import ExecInput
 from harbor.agents.installed.codex import Codex
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.paths import EnvironmentPaths
 
+from stet_harbor_agents.compat import ExecInput, HARBOR_HAS_EXEC_INPUT
 from stet_harbor_agents.patch_capture import AgentPatchCaptureMixin
 
 
@@ -75,8 +75,40 @@ class CodexAuthAgent(AgentPatchCaptureMixin, Codex):
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
+        if HARBOR_HAS_EXEC_INPUT:
+            try:
+                await super().run(
+                    instruction=instruction,
+                    environment=environment,
+                    context=context,
+                )
+            finally:
+                await self.capture_agent_patch(environment)
+            return
+
+        if hasattr(self, "render_instruction"):
+            instruction = self.render_instruction(instruction)
+
         try:
-            await super().run(instruction=instruction, environment=environment, context=context)
+            try:
+                for exec_input in self.create_run_agent_commands(instruction):
+                    await self.exec_as_agent(
+                        environment,
+                        command=exec_input.command,
+                        cwd=exec_input.cwd,
+                        env=exec_input.env,
+                        timeout_sec=exec_input.timeout_sec,
+                    )
+                self.populate_context_post_run(context)
+            finally:
+                try:
+                    await self.exec_as_agent(
+                        environment,
+                        command='rm -rf /tmp/codex-secrets "$CODEX_HOME/auth.json" "$CODEX_HOME/tmp"',
+                        env={"CODEX_HOME": EnvironmentPaths.agent_dir.as_posix()},
+                    )
+                except Exception:
+                    pass
         finally:
             await self.capture_agent_patch(environment)
 
@@ -94,10 +126,16 @@ class CodexAuthAgent(AgentPatchCaptureMixin, Codex):
         ):
             env["OPENAI_BASE_URL"] = openai_base_url
 
-        reasoning_effort = self._reasoning_effort
-        reasoning_flag = (
-            f"-c model_reasoning_effort={reasoning_effort} " if reasoning_effort else ""
-        )
+        cli_flags = self.build_cli_flags() if hasattr(self, "build_cli_flags") else ""
+        if cli_flags:
+            reasoning_flag = f"{cli_flags} "
+        else:
+            reasoning_effort = getattr(self, "_reasoning_effort", None)
+            reasoning_flag = (
+                f"-c model_reasoning_effort={reasoning_effort} "
+                if reasoning_effort
+                else ""
+            )
 
         setup_command = """
 mkdir -p /tmp/codex-secrets "$CODEX_HOME"

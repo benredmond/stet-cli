@@ -4,11 +4,11 @@ import base64
 import os
 from pathlib import Path
 
-from harbor.agents.installed.base import ExecInput
 from harbor.agents.installed.claude_code import ClaudeCode
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
+from stet_harbor_agents.compat import ExecInput
 from stet_harbor_agents.patch_capture import AgentPatchCaptureMixin
 
 
@@ -71,13 +71,8 @@ class ClaudeCodeAuthAgent(AgentPatchCaptureMixin, ClaudeCode):
 
         return env
 
-    def create_run_agent_commands(self, instruction: str) -> list[ExecInput]:
-        commands = super().create_run_agent_commands(instruction)
-        credential_env = self._credential_env()
-        if not commands or not credential_env:
-            return commands
-
-        setup_bootstrap = """
+    def _credential_bootstrap_command(self) -> str:
+        return """
 mkdir -p "$CLAUDE_CONFIG_DIR" "$HOME/.claude"
 if [ -n "${CLAUDE_CODE_CREDENTIALS_JSON_B64:-}" ]; then
   printf '%s' "$CLAUDE_CODE_CREDENTIALS_JSON_B64" | base64 -d > "$CLAUDE_CONFIG_DIR/.credentials.json"
@@ -90,13 +85,19 @@ elif [ -n "${CLAUDE_CODE_CREDENTIALS_JSON:-}" ]; then
 fi
 """.strip()
 
+    def create_run_agent_commands(self, instruction: str) -> list[ExecInput]:
+        commands = super().create_run_agent_commands(instruction)
+        credential_env = self._credential_env()
+        if not commands or not credential_env:
+            return commands
+
         updated_commands: list[ExecInput] = []
         for index, command in enumerate(commands):
             merged_env = dict(command.env or {})
             merged_env.update(credential_env)
             updated_command = command.command
             if index == 0:
-                updated_command = f"{setup_bootstrap} && {updated_command}"
+                updated_command = f"{self._credential_bootstrap_command()} && {updated_command}"
             updated_commands.append(
                 ExecInput(
                     command=updated_command,
@@ -108,6 +109,31 @@ fi
 
         return updated_commands
 
+    async def exec_as_agent(
+        self,
+        environment: BaseEnvironment,
+        command: str,
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+        timeout_sec: int | None = None,
+    ):
+        credential_env = self._credential_env()
+        if credential_env:
+            merged_env = dict(env or {})
+            merged_env.update(credential_env)
+            env = merged_env
+            if getattr(self, "_stet_claude_bootstrap_pending", False):
+                command = f"{command} && {self._credential_bootstrap_command()}"
+                self._stet_claude_bootstrap_pending = False
+
+        return await super().exec_as_agent(
+            environment,
+            command=command,
+            env=env,
+            cwd=cwd,
+            timeout_sec=timeout_sec,
+        )
+
     async def setup(self, environment: BaseEnvironment) -> None:
         await super().setup(environment)
         await self.snapshot_agent_patch(environment)
@@ -118,7 +144,12 @@ fi
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
+        previous_bootstrap_pending = getattr(
+            self, "_stet_claude_bootstrap_pending", False
+        )
+        self._stet_claude_bootstrap_pending = True
         try:
             await super().run(instruction=instruction, environment=environment, context=context)
         finally:
+            self._stet_claude_bootstrap_pending = previous_bootstrap_pending
             await self.capture_agent_patch(environment)

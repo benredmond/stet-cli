@@ -138,6 +138,7 @@ mkdir -p "$support_tmp/stet_harbor_agents"
 
 for support_file in \
   stet_harbor_agents/__init__.py \
+  stet_harbor_agents/compat.py \
   stet_harbor_agents/claude_code_auth.py \
   stet_harbor_agents/codex_auth.py \
   stet_harbor_agents/patch_capture.py \

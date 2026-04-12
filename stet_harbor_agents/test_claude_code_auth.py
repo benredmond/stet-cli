@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-def install_fake_harbor_modules():
+def install_fake_harbor_modules(with_exec_input=True):
     harbor = types.ModuleType("harbor")
     agents = types.ModuleType("harbor.agents")
     installed = types.ModuleType("harbor.agents.installed")
@@ -34,9 +34,18 @@ def install_fake_harbor_modules():
     class BaseEnvironment:
         def __init__(self):
             self.commands = []
+            self.execs = []
 
-        async def exec(self, command: str):
+        async def exec(self, command: str, **kwargs):
             self.commands.append(command)
+            self.execs.append({"command": command, **kwargs})
+
+            class Result:
+                return_code = 0
+                stdout = ""
+                stderr = ""
+
+            return Result()
 
     class AgentContext:
         pass
@@ -44,26 +53,71 @@ def install_fake_harbor_modules():
     class EnvironmentPaths:
         agent_dir = Path("/logs/agent")
 
-    class ClaudeCode:
-        def __init__(self, *args, **kwargs):
-            self._extra_env = kwargs.get("extra_env", {})
-            self._should_fail_run = False
+    if with_exec_input:
+        class ClaudeCode:
+            def __init__(self, *args, **kwargs):
+                self._extra_env = kwargs.get("extra_env", {})
+                self._should_fail_run = False
 
-        def _setup_env(self):
-            return {}
+            def _setup_env(self):
+                return {}
 
-        def create_run_agent_commands(self, instruction: str):
-            return [ExecInput(command=f"claude run {instruction}", cwd="/app", env={}, timeout_sec=60)]
+            def create_run_agent_commands(self, instruction: str):
+                return [ExecInput(command=f"claude run {instruction}", cwd="/app", env={}, timeout_sec=60)]
 
-        async def setup(self, environment):
-            return None
+            async def setup(self, environment):
+                return None
 
-        async def run(self, instruction: str, environment, context):
-            if self._should_fail_run:
-                raise RuntimeError("boom")
-            return None
+            async def run(self, instruction: str, environment, context):
+                if self._should_fail_run:
+                    raise RuntimeError("boom")
+                return None
 
-    base.ExecInput = ExecInput
+        base.ExecInput = ExecInput
+    else:
+        class ClaudeCode:
+            def __init__(self, *args, **kwargs):
+                self._extra_env = kwargs.get("extra_env", {})
+                self._should_fail_run = False
+
+            def _setup_env(self):
+                return {}
+
+            async def setup(self, environment):
+                return None
+
+            async def exec_as_agent(
+                self,
+                environment,
+                command: str,
+                env=None,
+                cwd=None,
+                timeout_sec=None,
+            ):
+                return await environment.exec(
+                    command=command,
+                    env=env,
+                    cwd=cwd,
+                    timeout_sec=timeout_sec,
+                )
+
+            async def run(self, instruction: str, environment, context):
+                if self._should_fail_run:
+                    raise RuntimeError("boom")
+                env = {
+                    "CLAUDE_CONFIG_DIR": "/logs/agent/sessions",
+                }
+                await self.exec_as_agent(
+                    environment,
+                    command="mkdir -p $CLAUDE_CONFIG_DIR",
+                    env=env,
+                )
+                await self.exec_as_agent(
+                    environment,
+                    command=f"claude --print -- {instruction}",
+                    env=env,
+                )
+
     claude_code.ClaudeCode = ClaudeCode
     environments_base.BaseEnvironment = BaseEnvironment
     models_agent_context.AgentContext = AgentContext
@@ -86,6 +140,8 @@ def install_fake_harbor_modules():
 class ClaudeCodeAuthAgentTests(unittest.TestCase):
     def setUp(self):
         install_fake_harbor_modules()
+        sys.modules.pop("stet_harbor_agents.compat", None)
+        sys.modules.pop("stet_harbor_agents.patch_capture", None)
         sys.modules.pop("stet_harbor_agents.claude_code_auth", None)
         self.module = importlib.import_module("stet_harbor_agents.claude_code_auth")
 
@@ -181,6 +237,49 @@ class ClaudeCodeAuthAgentTests(unittest.TestCase):
 
         self.assertEqual(len(environment.commands), 1)
         self.assertIn("/logs/agent/agent.patch", environment.commands[0])
+
+    def test_imports_when_harbor_base_does_not_export_execinput(self):
+        install_fake_harbor_modules(with_exec_input=False)
+        sys.modules.pop("stet_harbor_agents.compat", None)
+        sys.modules.pop("stet_harbor_agents.patch_capture", None)
+        sys.modules.pop("stet_harbor_agents.claude_code_auth", None)
+
+        module = importlib.import_module("stet_harbor_agents.claude_code_auth")
+
+        self.assertFalse(module.ExecInput.__module__.startswith("harbor."))
+
+    def test_harbor_without_execinput_run_injects_credentials_and_bootstraps(self):
+        install_fake_harbor_modules(with_exec_input=False)
+        sys.modules.pop("stet_harbor_agents.compat", None)
+        sys.modules.pop("stet_harbor_agents.patch_capture", None)
+        sys.modules.pop("stet_harbor_agents.claude_code_auth", None)
+        module = importlib.import_module("stet_harbor_agents.claude_code_auth")
+        os.environ["CLAUDE_CODE_CREDENTIALS_JSON"] = json.dumps(
+            {"claudeAiOauth": {"refreshToken": "refresh-token"}}
+        )
+        agent = module.ClaudeCodeAuthAgent()
+        environment = sys.modules["harbor.environments.base"].BaseEnvironment()
+        context = sys.modules["harbor.models.agent.context"].AgentContext()
+
+        asyncio.run(agent.run("fix it", environment, context))
+
+        self.assertGreaterEqual(len(environment.execs), 3)
+        setup_exec = environment.execs[0]
+        run_exec = environment.execs[1]
+        self.assertIn("mkdir -p $CLAUDE_CONFIG_DIR", setup_exec["command"])
+        self.assertIn("CLAUDE_CODE_CREDENTIALS_JSON_B64", setup_exec["command"])
+        self.assertIn(
+            "CLAUDE_CODE_CREDENTIALS_JSON_B64",
+            setup_exec["env"],
+        )
+        self.assertIn(
+            "CLAUDE_CODE_CREDENTIALS_JSON_B64",
+            run_exec["env"],
+        )
+        decoded = base64.b64decode(
+            setup_exec["env"]["CLAUDE_CODE_CREDENTIALS_JSON_B64"]
+        ).decode()
+        self.assertEqual(decoded, os.environ["CLAUDE_CODE_CREDENTIALS_JSON"])
 
 
 if __name__ == "__main__":
