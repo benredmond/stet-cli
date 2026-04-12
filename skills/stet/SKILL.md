@@ -138,6 +138,7 @@ Rules for the optimizer:
 - For installed MVP binaries, use the private dist repo update flow:
   `stet --version`, `stet update`, or `stet update --version <tag>`. Pilot
   users need access to `benredmond/stet-dist`, not the private source repo.
+  `stet update` refreshes both the binary and local Harbor support agents.
 - For the shipped Stet agent skill, use the same private dist repo:
   `npx skills add git@github.com:benredmond/stet-dist.git --skill stet`.
   Release automation syncs `skills/stet` into
@@ -259,10 +260,13 @@ models, setting up a repo, improving a skill, or checking a release?"
 - Start with the cheapest surface that answers the question without discarding
   provenance or release-state semantics the operator is asking for.
 - If a Claude Code run reports that `/login` is required, treat it as a host
-  auth/bootstrap issue before interpreting eval quality. Verify
-  `claude -p "reply with ok" --output-format text`, then ensure Stet can forward
-  `CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`, or the
-  macOS Keychain item named `Claude Code-credentials` into Harbor.
+  auth/bootstrap issue before interpreting eval quality. Prefer
+  `claude setup-token`, then export `CLAUDE_CODE_OAUTH_TOKEN` with the printed
+  token. Stet also accepts `CLAUDE_CODE_CREDENTIALS_JSON_B64`,
+  `CLAUDE_CODE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`,
+  `ANTHROPIC_AUTH_TOKEN`, or the macOS Keychain item named
+  `Claude Code-credentials`, and fails before launching Claude when none are
+  available.
 - In cost-constrained compare or baseline-first workflows, check `stet context --json` first and inspect `artifact_reuse` before proposing a fresh eval. Reuse an exact comparable root when one exists; when that root is likely to anchor repeated candidate work, freeze it as a baseline before the next compare. If only a near match exists, explain the drift explicitly before spending more.
 - For model, reasoning-level, or harness-setting selection on a repo with Stet
   history, run `stet context --repo <repo> --json` before proposing a fresh

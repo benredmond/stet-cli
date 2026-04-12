@@ -36,16 +36,20 @@ For most repos, the quick path is enough:
 #    Write .stet/harbor.Dockerfile for this repo and reference it from
 #    .stet/stet.harness.yaml under environment.dockerfile.
 
-# 3. Persist config
+# 3. If Claude is the selected provider, set up host auth first
+#    Run `claude setup-token`, then export CLAUDE_CODE_OAUTH_TOKEN with the
+#    printed token. Stet fails before launching Claude runs if auth is missing.
+
+# 4. Persist config
 stet init --repo . --yes --test "<repo test cmd>"
 
-# 4. Mine candidate pool
+# 5. Mine candidate pool
 stet suite discover --repo . --rev-range main~50..main --output discover-manifest.yaml
 
-# 5. Build dataset
+# 6. Build dataset
 stet suite build --repo . --manifest discover-manifest.yaml --out ./stet-dataset
 
-# 6. Read receipt and propose starter slice
+# 7. Read receipt and propose starter slice
 # Build writes onboarding_receipt.v1.json to the dataset root.
 ```
 
@@ -66,6 +70,10 @@ Quality onboarding rules:
 - Interactive `stet init` now recommends enabling the `discipline` bundle plus
   `intentionality` as an extra grader. Accepting that prompt writes the repo
   `quality` selection into `stet.yaml`.
+- `stet init --ai-provider claude` requires usable Claude auth. Prefer
+  `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`; Stet also accepts
+  Claude credential JSON, Anthropic API/auth token env vars, or the macOS
+  `Claude Code-credentials` Keychain item.
 - `stet init --yes` stays low-friction and does not enable quality bundles by
   default. Silent auto-init paths should keep bundle selection empty until an
   operator opts in.

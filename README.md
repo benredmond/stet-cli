@@ -146,25 +146,24 @@ harbor --version
 ```
 
 If you plan to run Claude Code models, authenticate Claude Code on the host
-before running Stet. Start `claude`, run `/login`, complete the browser flow,
-then verify non-interactive mode:
+before running Stet. The preferred setup for non-interactive Stet runs is a
+Claude OAuth token:
 
 ```sh
-claude -p "reply with ok" --output-format text
+claude setup-token
+export CLAUDE_CODE_OAUTH_TOKEN=<printed token>
 ```
 
 Stet's installer places its Harbor auth bridge under
-`$HOME/.local/share/stet/harbor-agents`. On macOS, Stet can read the
-`Claude Code-credentials` Keychain item created by `/login`. On Linux or other
-environments, export the credential JSON explicitly before launching Stet:
-
-```sh
-export CLAUDE_CODE_CREDENTIALS_JSON="$(cat "$HOME/.claude/.credentials.json")"
-```
+`$HOME/.local/share/stet/harbor-agents`. Stet also accepts
+`CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`,
+`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, or the macOS Keychain item named
+`Claude Code-credentials`. If Claude is selected and none of those are present,
+Stet fails before launching the run.
 
 If a Harbor run still prints that Claude needs `/login`, first rerun the Stet
 installer for the current version so the Harbor auth bridge is present, then
-rerun the `claude -p ...` check above.
+rerun the auth setup above.
 
 Optional, but useful when the user approves downloading benchmark tasks and containers:
 
@@ -192,7 +191,7 @@ Use a custom install directory when needed:
 stet update --bin-dir "$HOME/.local/bin"
 ```
 
-`stet update` and `install.sh` verify `checksums.txt` before replacing the local binary. Updates are pull-based only; Stet does not perform background or silent auto-updates.
+`stet update` and `install.sh` verify `checksums.txt` before replacing the local binary. They also refresh Stet's local Harbor support agents under `$HOME/.local/share/stet/harbor-agents`. Updates are pull-based only; Stet does not perform background or silent auto-updates.
 
 ## Troubleshooting
 
@@ -209,11 +208,10 @@ If Docker is installed but unavailable, start Docker Desktop on macOS or the Doc
 
 If Harbor is not found after install, add the `uv` tool bin directory to `PATH` and rerun `harbor --version`.
 
-If Claude Code runs fail with a message that `/login` is required, authenticate
-Claude Code on the host with `claude` then `/login`. For container-backed Stet
-runs, also ensure either macOS Keychain has `Claude Code-credentials` or
-`CLAUDE_CODE_CREDENTIALS_JSON` contains the contents of
-`$HOME/.claude/.credentials.json`.
+If Claude Code runs fail with missing-auth guidance, run `claude setup-token`,
+export `CLAUDE_CODE_OAUTH_TOKEN`, and rerun Stet. For container-backed Stet
+runs, Stet can also use Claude credential JSON env vars, Anthropic API/auth
+token env vars, or the macOS Keychain item named `Claude Code-credentials`.
 
 If no stable Stet release exists yet, install or update to an explicit prerelease version:
 
