@@ -52,25 +52,25 @@ stet --version
 The repo includes the Stet skill under `skills/stet`, following the Agent Skills `SKILL.md` directory format. Install it with the `npx skills` CLI:
 
 ```sh
-npx skills add benredmond/stet-dist --skill stet
+npx skills add git@github.com:benredmond/stet-dist.git --skill stet
 ```
 
 To install globally for Codex:
 
 ```sh
-npx skills add benredmond/stet-dist --skill stet --global --agent codex --yes
+npx skills add git@github.com:benredmond/stet-dist.git --skill stet --global --agent codex --yes
 ```
 
 To inspect the skill before installing:
 
 ```sh
-npx skills add benredmond/stet-dist --list
+npx skills add git@github.com:benredmond/stet-dist.git --list
 ```
 
-If the GitHub shorthand cannot access the private repo in your environment, use the full GitHub URL:
+If your environment has HTTPS git credentials configured for private GitHub repos, the GitHub shorthand also works:
 
 ```sh
-npx skills add https://github.com/benredmond/stet-dist --skill stet
+npx skills add benredmond/stet-dist --skill stet
 ```
 
 ### 4. Install Docker

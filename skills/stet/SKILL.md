@@ -139,9 +139,9 @@ Rules for the optimizer:
   `stet --version`, `stet update`, or `stet update --version <tag>`. Pilot
   users need access to `benredmond/stet-dist`, not the private source repo.
 - For the shipped Stet agent skill, use the same private dist repo:
-  `npx skills add benredmond/stet-dist --skill stet`. Release automation syncs
-  `skills/stet` into `distribution/stet-dist/skills/stet` before publishing
-  dist collateral.
+  `npx skills add git@github.com:benredmond/stet-dist.git --skill stet`.
+  Release automation syncs `skills/stet` into
+  `distribution/stet-dist/skills/stet` before publishing dist collateral.
 - On command failure, read status when possible, fail closed, and use the
   recovery patterns in [operator-contract](references/operator-contract.md).
 

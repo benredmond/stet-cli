@@ -169,11 +169,13 @@ selection:
   rev_range: main~5..main
 eval:
   dataset: ./dataset
-  baseline_model: claude-sonnet-4-20250514
-  candidate_model: claude-sonnet-4-20250514
+  baseline_model: model:sonnet 4.6
+  candidate_model: model:sonnet 4.6
 ```
 
 Use the same model for both arms when testing instructions, not the model.
+Model fields are selectors, so use `model:<name or alias>` rather than a raw
+model string.
 
 When you already froze the baseline evidence with `stet baseline freeze`, replace
 `baseline_model` with the benchmark baseline reference:
@@ -182,7 +184,7 @@ When you already froze the baseline evidence with `stet baseline freeze`, replac
 eval:
   dataset: ./dataset
   baseline: .stet/baselines/my-capability.json
-  candidate_model: claude-sonnet-4-20250514
+  candidate_model: model:sonnet 4.6
 ```
 
 `eval.baseline` is mutually exclusive with `eval.baseline_model`. In this mode
