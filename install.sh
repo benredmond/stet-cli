@@ -127,6 +127,27 @@ tar -xzf "$archive" -C "$extract_dir"
 [ -f "$extract_dir/stet" ] || die "archive member stet must be a regular file"
 [ -x "$extract_dir/stet" ] || die "archive member stet must be executable"
 
+support_root="$HOME/.local/share/stet/harbor-agents"
+case "$support_root" in
+  ""|"/"|"$HOME"|"$HOME/")
+    die "unsafe Stet support install directory: $support_root"
+    ;;
+esac
+support_tmp="$tmp_dir/harbor-agents"
+mkdir -p "$support_tmp/stet_harbor_agents"
+
+for support_file in \
+  stet_harbor_agents/__init__.py \
+  stet_harbor_agents/claude_code_auth.py \
+  stet_harbor_agents/codex_auth.py \
+  stet_harbor_agents/patch_capture.py \
+  stet_harbor_agents/install-claude-code-auth.sh.j2
+do
+  support_dest="$support_tmp/$support_file"
+  mkdir -p "$(dirname "$support_dest")"
+  gh api "repos/$repo/contents/$support_file?ref=$version" --header "Accept: application/vnd.github.raw" > "$support_dest"
+done
+
 mkdir -p "$bin_dir"
 bin_dir_abs="$(cd "$bin_dir" && pwd -P)"
 target="$bin_dir_abs/stet"
@@ -145,6 +166,10 @@ if [ -L "$target" ]; then
     *) die "$target is a symlink outside $bin_dir_abs; rerun with --bin-dir pointing at the real install directory" ;;
   esac
 fi
+
+mkdir -p "$(dirname "$support_root")"
+rm -rf "$support_root"
+mv "$support_tmp" "$support_root"
 
 tmp_target="$(mktemp "$bin_dir_abs/.stet-update.XXXXXX")"
 cp "$extract_dir/stet" "$tmp_target"

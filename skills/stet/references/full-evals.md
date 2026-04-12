@@ -146,9 +146,10 @@ stet eval report --change-manifest stet.change.yaml --json
 
 ## Rules
 
-- Repo onboarding starts with agent-selected repo tests, then `stet init` when
-  repo config is missing, then `stet suite discover` + `stet suite build`, not
-  a full `stet eval run`.
+- Repo onboarding starts with agent-selected repo tests plus an authored
+  `.stet/harbor.Dockerfile` referenced by `.stet/stet.harness.yaml`, then
+  `stet init` when repo config is missing, then `stet suite discover` +
+  `stet suite build`, not a full `stet eval run`.
 - `stet eval smoke` is the canonical quick first-run wrapper.
 - `stet eval run` is the canonical public home for multi-model H2H execution.
 - `stet eval run --stitch-rerun` is the supported subset-rerun path for an

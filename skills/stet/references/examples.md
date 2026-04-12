@@ -170,7 +170,9 @@ the agent could recommend it.
 Agent routes to: onboarding.
 Agent reads: `references/onboarding.md`
 
-Agent inspects CI (`.github/workflows/test.yml`), finds `npm test`.
+Agent inspects CI (`.github/workflows/test.yml`), finds `npm test`, then
+authors `.stet/harbor.Dockerfile` and `.stet/stet.harness.yaml` with
+`environment.dockerfile: .stet/harbor.Dockerfile`.
 
 ```bash
 stet init --repo . --yes --test "npm test"

@@ -198,7 +198,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | "What is this run doing?" | `stet eval status` | [compare-and-checkin](references/compare-and-checkin.md) |
 | "Repair missing additive grader coverage on a finished run" | `stet runs repair-ai-coverage` or `stet runs regrade-graders` | [compare-and-checkin](references/compare-and-checkin.md) |
 | "Resume an incomplete rules compare" | `stet eval rules resume` | [rules-flow](references/rules-flow.md) |
-| "Set up evals for this repo" | `stet init` then `stet suite discover` | [onboarding](references/onboarding.md) |
+| "Set up evals for this repo" | author `.stet/harbor.Dockerfile` + `.stet/stet.harness.yaml`, then `stet init` and `stet suite discover` | [onboarding](references/onboarding.md) |
 | "Build a large dataset (50+ tasks)" | `stet suite discover` + `stet suite build` | [dataset-build](references/dataset-build.md) |
 | "Is my shared skill better?" | `stet eval rules skill` | [rules-flow](references/rules-flow.md), [iterative-improvement](references/iterative-improvement.md) |
 | "Is my research / plan better?" | choose or write custom rubrics | [rubric-authoring](references/rubric-authoring.md) |
@@ -220,7 +220,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | Pairwise compare | Baseline vs candidate | `stet eval compare` -> `stet eval report` |
 | Baseline-first | Freeze reusable evidence, then compare candidates without rerunning the baseline arm | `stet baseline freeze` -> `stet eval compare --baseline` |
 | Rules skill loop | Replay-backed shared skill improvement on the canonical rules surface | `stet eval rules skill` -> `stet eval status` -> `stet eval report` |
-| Repo onboarding | New repo, no dataset yet | `stet init` -> `suite discover` -> `suite build` |
+| Repo onboarding | New repo, no dataset yet | author harness Dockerfile -> `stet init` -> `suite discover` -> `suite build` |
 | Dataset eval | Reusable benchmark | `suite build` -> `eval run` -> `report` |
 | Workbench probe | Iterative artifact improvement | `workbench probe` -> `report` -> `workbench gate` |
 | Release lifecycle | Promote, monitor, rollback | gate -> `promote` / `monitor` / `rollback` |
@@ -258,6 +258,11 @@ models, setting up a repo, improving a skill, or checking a release?"
 - Prefer `--json` when the output feeds another agent step.
 - Start with the cheapest surface that answers the question without discarding
   provenance or release-state semantics the operator is asking for.
+- If a Claude Code run reports that `/login` is required, treat it as a host
+  auth/bootstrap issue before interpreting eval quality. Verify
+  `claude -p "reply with ok" --output-format text`, then ensure Stet can forward
+  `CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`, or the
+  macOS Keychain item named `Claude Code-credentials` into Harbor.
 - In cost-constrained compare or baseline-first workflows, check `stet context --json` first and inspect `artifact_reuse` before proposing a fresh eval. Reuse an exact comparable root when one exists; when that root is likely to anchor repeated candidate work, freeze it as a baseline before the next compare. If only a near match exists, explain the drift explicitly before spending more.
 - For model, reasoning-level, or harness-setting selection on a repo with Stet
   history, run `stet context --repo <repo> --json` before proposing a fresh

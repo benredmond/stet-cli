@@ -32,7 +32,7 @@ The task .md IS the state. On resume, read it to determine current phase:
 |---|---|
 | Nothing / just frontmatter | Phase 0 |
 | `## Pre-screen` filled | Phase 1 |
-| `## Config Draft` with install_config | Phase 2 |
+| `## Config Draft` with Harbor Dockerfile + harness manifest | Phase 2 |
 | `## Iteration Log` with gold_pass >= 80% | Phase 3 |
 | `## Build Log` with cumulative count >= target | Done — run audit checks |
 
@@ -75,8 +75,8 @@ Yield interpretation:
 
 ## Phase 1: Understand + Draft
 
-Goal: produce a working `install_config.sh` and `allowlist.json` by mining
-the repo's own CI and build files.
+Goal: produce a working `.stet/harbor.Dockerfile` plus
+`.stet/stet.harness.yaml` by mining the repo's own CI and build files.
 
 Launch 3 parallel subagents:
 
@@ -88,51 +88,64 @@ Launch 3 parallel subagents:
    setup instructions, test commands, gotchas, system deps.
 
 Synthesize into:
-- `scripts/{repo}-install-config.sh` (deterministic JSON output)
-- `scripts/{repo}-install-allowlist.json` (prefix allowlist)
+- `.stet/harbor.Dockerfile` — repo-specific Harbor environment
+- `.stet/stet.harness.yaml` — points `environment.dockerfile` at that file
+- `stet init --test "<repo test cmd>"` — persist the canonical test command
 
-**test_cmd must run the repo's actual test suite, not a smoke test.** Priority:
-CI workflow > Makefile target > package.json script > README.
+**The test command must run the repo's actual test suite, not a smoke test.**
+Priority: CI workflow > Makefile target > package.json script > README.
 
 Proactive gotcha handling:
 
 | Issue | Prevention |
 |---|---|
-| Shell operators in commands | Separate array entries |
-| `sed` on files missing in old commits | `find . -name <file> -exec sed ... {} +` |
-| Package manager network flakes | Retry config, reduce concurrency |
-| Wrong Node/Python version | Pin to CI matrix version |
+| Missing system tools | Install them in the Harbor Dockerfile |
+| Wrong Node/Python version | Pin to CI matrix version in the Dockerfile |
+| Package manager network flakes | Add retry config in the Dockerfile |
+| Repo expects setup steps before tests | Encode them in the Dockerfile, keep `stet init --test` focused on test execution |
 
-**CHECKPOINT: Show user the draft config + CI references. Proceed on approval.**
+Minimal harness contract:
+
+```yaml
+version: 1
+schema: stet.harness/v1
+runner:
+  tb_cmd:
+    - harbor
+environment:
+  dockerfile: .stet/harbor.Dockerfile
+```
+
+**CHECKPOINT: Show the drafted Harbor Dockerfile, harness manifest, and test command with CI references. Proceed on approval.**
 
 ## Phase 2: Iterate to Green
 
 Goal: >= 80% gold pass rate on a smoke batch.
 
 ```bash
+stet init --repo /path/to/local/repo --yes --test "<repo test cmd>"
+
 stet suite discover --repo owner/repo --rev-range main~30..main --limit 10 \
   --output $MANIFEST_DIR/manifest.yaml
 
 stet suite build --repo /path/to/local/repo --manifest $MANIFEST_DIR/manifest.yaml \
-  --out $OUT --workers 2 --require-f2p=false --llm-install-config \
-  --max-recipe-attempts 1 --install-allowlist scripts/{repo}-install-allowlist.json \
-  --ai-cmd scripts/{repo}-install-config.sh
+  --out $OUT --workers 2 --require-f2p=false
 ```
 
 Debug loop (up to 5 attempts). Ordered by frequency:
 
 | Failure pattern | Classification | Fix |
 |---|---|---|
-| `command not found: make/cmake/gcc` | missing_binary | Add `apt-get install -y {binary}` to pre_install |
-| `No such file: python3.X` / `node: not found` | wrong_runtime | Change runtime_version to CI matrix |
-| `Timeout` / `exceeded time limit` | timeout | Increase test_sec; add `-x` to test runner |
-| `ModuleNotFoundError` / `Cannot find module` | import_error | Add missing dep to install commands |
-| `ConnectionError` / `fetch failed` | network_flake | Add retry config, reduce concurrency |
-| `ENOENT` from sed on old commits | path_drift | Use `find . -name <file> -exec sed ... {} +` |
-| vitest/jest per-test timeout | test_config | Patch config: `sed -i 's/test: {/test: { testTimeout: 30000,/'` |
+| `command not found: make/cmake/gcc` | missing_binary | Add `apt-get install -y {binary}` to `.stet/harbor.Dockerfile` |
+| `No such file: python3.X` / `node: not found` | wrong_runtime | Change runtime/toolchain in `.stet/harbor.Dockerfile` |
+| `Timeout` / `exceeded time limit` | timeout | Keep the same test command; fix setup/runtime in the Dockerfile first |
+| `ModuleNotFoundError` / `Cannot find module` | import_error | Add the missing dependency install to `.stet/harbor.Dockerfile` |
+| `ConnectionError` / `fetch failed` | network_flake | Add retry config / package manager setup to the Dockerfile |
+| `ENOENT` from setup hacks on old commits | path_drift | Simplify the Dockerfile; avoid commit-fragile file mutations when possible |
+| vitest/jest per-test timeout | test_config | Prefer durable repo/env setup; patch configs only if CI already does something similar |
 | `ENOMEM` / OOM killed | resource_limit | Reduce `--workers` to 1; reduce test parallelism |
 | Docker daemon errors | infra_error | Check `docker ps`, kill zombies, retry |
-| Lockfile version mismatch | lockfile_drift | Pin package manager version in pre_install |
+| Lockfile version mismatch | lockfile_drift | Pin package manager version in `.stet/harbor.Dockerfile` |
 
 After >= 80% gold pass, verify test_cmd relevance: pick a task with test
 patch, confirm test_cmd runs those files.
@@ -158,7 +171,7 @@ Course correction:
 
 | Signal | Action |
 |---|---|
-| 429 rate limit | Switch `--ai-cmd` |
+| Repeated package-download flake | Harden the Harbor Dockerfile with retries / mirrors |
 | Gold pass < 50% | Toolchain drift — fix config or stop |
 | Discover pass < 15% | Diminishing returns |
 | Docker errors | Kill zombies, reduce workers |
@@ -182,75 +195,58 @@ Each phase checkpoint maps to keyed actions:
 - `[r] rerun`: retry the current phase after a config or toolchain fix
 - `[s] stop`: halt the pipeline at the current phase
 
-## Ecosystem Templates
+## Harbor Dockerfile Starting Points
 
-Use as starting skeleton. Override test_cmd and runtime_version from CI.
+Use these as starting points; pin versions from CI and keep the actual repo
+test command in `stet init --test`.
 
 ### Python (uv)
-```json
-{
-  "language": "python", "runtime_version": "3.12",
-  "pre_install": ["apt-get update -qq", "apt-get install -y -qq git make"],
-  "install": ["uv sync --frozen --all-packages"],
-  "test_cmd": ["uv run pytest tests/ -x -q --timeout=60"],
-  "timeouts": {"install_sec": 600, "test_sec": 1800}
-}
+```dockerfile
+FROM ghcr.io/laude-institute/t-bench/ubuntu-24-04:20250624
+RUN apt-get update -qq && apt-get install -y -qq git make curl && rm -rf /var/lib/apt/lists/*
+# install Python/uv version that matches CI here
+WORKDIR /app
+ADD repo.tar.gz /app
+RUN uv sync --frozen --all-packages
 ```
 
-### Python (poetry)
-```json
-{
-  "language": "python", "runtime_version": "3.12",
-  "pre_install": ["apt-get update -qq", "apt-get install -y -qq git make",
-    "pip install poetry"],
-  "install": ["poetry install --no-interaction"],
-  "test_cmd": ["poetry run pytest tests/ -x -q --timeout=60"],
-  "timeouts": {"install_sec": 600, "test_sec": 1800}
-}
-```
-
-### Python (pip)
-```json
-{
-  "language": "python", "runtime_version": "3.12",
-  "pre_install": ["apt-get update -qq", "apt-get install -y -qq git make"],
-  "install": ["pip install -e '.[dev,test]'"],
-  "test_cmd": ["python -m pytest tests/ -x -q --timeout=60"],
-  "timeouts": {"install_sec": 600, "test_sec": 1800}
-}
-```
-
-### TypeScript (pnpm)
-```json
-{
-  "language": "typescript", "runtime_version": "20",
-  "pre_install": ["apt-get update -qq", "apt-get install -y -qq git",
-    "corepack enable", "corepack prepare pnpm@latest --activate"],
-  "install": ["pnpm install --frozen-lockfile --prefer-offline", "pnpm run build"],
-  "test_cmd": ["pnpm test"],
-  "timeouts": {"install_sec": 600, "test_sec": 1800}
-}
-```
-
-### TypeScript (npm)
-```json
-{
-  "language": "typescript", "runtime_version": "20",
-  "pre_install": ["apt-get update -qq", "apt-get install -y -qq git"],
-  "install": ["npm ci", "npm run build"],
-  "test_cmd": ["npm test"],
-  "timeouts": {"install_sec": 600, "test_sec": 1800}
-}
+### Node / pnpm
+```dockerfile
+FROM ghcr.io/laude-institute/t-bench/ubuntu-24-04:20250624
+RUN apt-get update -qq && apt-get install -y -qq git curl && rm -rf /var/lib/apt/lists/*
+# install Node + pnpm versions that match CI here
+WORKDIR /app
+ADD repo.tar.gz /app
+RUN pnpm install --frozen-lockfile
 ```
 
 ### Go
-```json
-{
-  "language": "go", "runtime_version": "1.24",
-  "pre_install": ["apt-get update -qq", "apt-get install -y -qq git make"],
-  "install": ["go mod download"],
-  "test_cmd": ["go test ./... -count=1 -timeout=300s"],
-  "env_vars": {"CGO_ENABLED": "0"},
-  "timeouts": {"install_sec": 300, "test_sec": 1800}
-}
+```dockerfile
+FROM ghcr.io/laude-institute/t-bench/ubuntu-24-04:20250624
+RUN apt-get update -qq && apt-get install -y -qq git curl build-essential && rm -rf /var/lib/apt/lists/*
+# install Go version that matches CI here
+WORKDIR /app
+ADD repo.tar.gz /app
+RUN go mod download
+```
+
+### TypeScript (pnpm)
+```dockerfile
+FROM ghcr.io/laude-institute/t-bench/ubuntu-24-04:20250624
+RUN apt-get update -qq && apt-get install -y -qq git curl && rm -rf /var/lib/apt/lists/*
+# install Node + corepack/pnpm versions that match CI here
+WORKDIR /app
+ADD repo.tar.gz /app
+RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN pnpm install --frozen-lockfile --prefer-offline
+```
+
+### TypeScript (npm)
+```dockerfile
+FROM ghcr.io/laude-institute/t-bench/ubuntu-24-04:20250624
+RUN apt-get update -qq && apt-get install -y -qq git curl && rm -rf /var/lib/apt/lists/*
+# install Node version that matches CI here
+WORKDIR /app
+ADD repo.tar.gz /app
+RUN npm ci
 ```
