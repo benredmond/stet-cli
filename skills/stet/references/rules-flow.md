@@ -190,6 +190,14 @@ eval:
   harness: .stet/high-memory.harness.yaml
 ```
 
+Rules reports include each compare arm's effective runner settings when Stet
+has them. If a Claude Code compare emits
+`harbor_claude_code_concurrent_setup_cache_skew`, treat setup-only arm failures
+as infrastructure risk first: Harbor `--force-build` still reuses Docker
+layers, so the candidate arm may start installer-heavy containers more
+synchronously than the baseline. Lower `--tb-concurrency` to `2` and use
+`runner.tb_args` memory overrides before rerunning.
+
 This applies the same runner config to both arms. It is runtime config, not the
 candidate treatment. Use `change.rules.harness` only with a `harness_bundle`
 treatment when the harness itself is the thing being evaluated. Do not add

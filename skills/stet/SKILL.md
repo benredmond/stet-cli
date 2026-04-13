@@ -270,6 +270,13 @@ models, setting up a repo, improving a skill, or checking a release?"
   `ANTHROPIC_AUTH_TOKEN`, or the macOS Keychain item named
   `Claude Code-credentials`, and fails before launching Claude when none are
   available.
+- If `stet eval report` shows
+  `harbor_claude_code_concurrent_setup_cache_skew`, treat candidate setup
+  failures as infrastructure risk before interpreting treatment quality.
+  Harbor `--force-build` still reuses Docker layers, so the second compare arm
+  can start Claude Code installs more synchronously than the first. Prefer
+  `--tb-concurrency 2` for Claude Code compare runs and use `runner.tb_args`
+  memory overrides when pods still OOM.
 - Commercial access control gates eval execution, replay, evaluator AI, grader
   repair, and monitor reruns. If a user hits a Stet license/trial denial, direct
   them to `stet auth login` and use `stet auth status` to confirm email,
