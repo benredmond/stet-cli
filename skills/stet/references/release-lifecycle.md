@@ -164,6 +164,9 @@ Machine-readable contract:
 - `monitor status` is read-only. It queries the release record and returns
   posture without executing work. `lifecycle.execution_status` reflects the
   last known state, not a fresh measurement.
+- Monitoring history entries carry their source `release_id`; treat trust drops
+  as monitor regressions only when adjacent explicit history entries belong to
+  the same release.
 - `monitor run` is execute. It replays the promoted release's frozen
   `task_selection`, runs the evaluator, and writes fresh monitoring evidence.
   `lifecycle.freshness_status` updates to `fresh` on success.

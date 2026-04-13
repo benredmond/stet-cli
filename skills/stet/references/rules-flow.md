@@ -94,7 +94,7 @@ over unchanged evidence is a read path: it must not advance the loop cycle.
 
 For harness-bundle guards, keep the public/private boundary straight:
 - `stet.harness/v1` is still the minimal public input manifest.
-- The richer executed evidence lives below that boundary as `harness_surface` inside `rules_runtime.v1.json`, `stet eval report --change-manifest --json`, and `release.v1.json`. Harness-bundle runs use `kind: harness_bundle`; ordinary `agents_md` / `claude_md` runs use `kind: instruction_surface` unless the suite supplies `eval.harness`, which records `kind: runtime_harness`.
+- The richer executed evidence lives below that boundary as `harness_surface` inside `rules_runtime.v1.json`, `stet eval report --change-manifest --json`, and `release.v1.json`. Harness-bundle runs use `kind: harness_bundle`; ordinary `agents_md` / `claude_md` runs use `kind: instruction_surface` unless the suite uses the repo default `.stet/stet.harness.yaml` or supplies `eval.harness`, which records `kind: runtime_harness`.
 - If the rules launch also declares `change.rules.search_space: ./stet.search_space.yaml`, the public `stet.search_space/v1` manifest stays requested-contract only while runtime and rules reports project the executed `search_space` object plus `search_space_path` and `search_space_digest` with `source=requested_manifest`. Without that manifest, rules runtime still emits `search_space` with `source=runtime_default` so the effective bounded context is always present. `release.v1.json` carries the same nested `search_space` object and tracks the digest under freshness.
 - `manifest resolve` does not emit `harness_surface`, `search_space`, staged manifest paths, or other runtime-only provenance.
 
@@ -177,15 +177,17 @@ Use the same model for both arms when testing instructions, not the model.
 Model fields are selectors, so use `model:<name or alias>` rather than a raw
 model string.
 
-When Harbor needs runtime settings such as larger pod memory, put them in a
-`stet.harness/v1` manifest and reference it from the suite eval block:
+When Harbor needs runtime settings such as larger pod memory, put them in the
+repo's `.stet/stet.harness.yaml`; suite-backed rules runs apply that canonical
+manifest automatically. Use `eval.harness` when the suite should point at a
+different harness manifest:
 
 ```yaml
 eval:
   dataset: ./dataset
   baseline_model: model:sonnet 4.6
   candidate_model: model:sonnet 4.6
-  harness: .stet/stet.harness.yaml
+  harness: .stet/high-memory.harness.yaml
 ```
 
 This applies the same runner config to both arms. It is runtime config, not the

@@ -270,12 +270,13 @@ models, setting up a repo, improving a skill, or checking a release?"
   `ANTHROPIC_AUTH_TOKEN`, or the macOS Keychain item named
   `Claude Code-credentials`, and fails before launching Claude when none are
   available.
-- Commercial access control gates only `stet eval rules` in v1. If a user hits
-  a Stet license/trial denial, direct them to `stet auth login` and use
-  `stet auth status` to confirm email, entitlement, trial expiration, and
-  commercial workflow availability. Preserve local command guidance for ungated
-  flows such as `suite discover`, `suite build`, `eval smoke`, `eval status`,
-  `eval report`, and local artifact inspection.
+- Commercial access control gates eval execution, replay, evaluator AI, grader
+  repair, and monitor reruns. If a user hits a Stet license/trial denial, direct
+  them to `stet auth login` and use `stet auth status` to confirm email,
+  entitlement, trial expiration, and commercial workflow availability. Preserve
+  local command guidance for ungated flows such as `suite discover`,
+  `suite build`, `eval status`, `eval report`, rollback, and local artifact
+  inspection.
 - In cost-constrained compare or baseline-first workflows, check `stet context --json` first and inspect `artifact_reuse` before proposing a fresh eval. Reuse an exact comparable root when one exists; when that root is likely to anchor repeated candidate work, freeze it as a baseline before the next compare. If only a near match exists, explain the drift explicitly before spending more.
 - For model, reasoning-level, or harness-setting selection on a repo with Stet
   history, run `stet context --repo <repo> --json` before proposing a fresh

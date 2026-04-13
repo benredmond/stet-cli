@@ -134,9 +134,10 @@ Use this for `ENOMEM` / OOMKilled failures during agent setup, including
 Claude Code installation. Prefer `8192` MB first, then `16384` MB if the
 install still OOMs.
 
-For suite-backed rules runs, reference the same harness from `stet.suite.yaml`
-under `eval.harness` (scalar path or `manifest:` object). Do not add `runner:`
-to `stet.yaml`; runner settings live in `stet.harness/v1`.
+Suite-backed rules runs automatically apply `.stet/stet.harness.yaml` when it
+exists. Use `eval.harness` in `stet.suite.yaml` only for a non-default harness
+manifest (scalar path or `manifest:` object). Do not add `runner:` to
+`stet.yaml`; runner settings live in `stet.harness/v1`.
 
 **CHECKPOINT: Show the drafted Harbor Dockerfile, harness manifest, and test command with CI references. Proceed on approval.**
 
