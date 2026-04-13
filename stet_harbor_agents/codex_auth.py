@@ -203,6 +203,7 @@ ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"
                     "2>&1 </dev/null | stdbuf -oL tee -a \"$agent_log\""
                 ),
                 env=env,
+                timeout_sec=self._extended_agent_timeout(None),
             ),
         ]
 

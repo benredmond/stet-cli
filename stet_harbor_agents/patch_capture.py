@@ -14,10 +14,17 @@ class AgentPatchCaptureMixin:
     _PATCH_SNAPSHOT_DIR = Path("/tmp/agent-patch-snapshot")
     _APP_DIR = Path("/app")
     _PATCH_FILENAME = "agent.patch"
+    _PATCH_OPERATION_TIMEOUT_SEC = 1800
+    _AGENT_RUN_TIMEOUT_SEC = 1800
 
     @staticmethod
     def _quote(path: Path) -> str:
         return shlex.quote(path.as_posix())
+
+    def _extended_agent_timeout(self, timeout_sec: int | None) -> int:
+        if timeout_sec is None:
+            return self._AGENT_RUN_TIMEOUT_SEC
+        return max(timeout_sec, self._AGENT_RUN_TIMEOUT_SEC)
 
     @property
     def _snapshot_root(self) -> Path:
@@ -88,9 +95,15 @@ exit 0
             raise
 
     async def snapshot_agent_patch(self, environment: BaseEnvironment) -> None:
-        await environment.exec(command=self._snapshot_command())
+        await environment.exec(
+            command=self._snapshot_command(),
+            timeout_sec=self._PATCH_OPERATION_TIMEOUT_SEC,
+        )
 
     async def capture_agent_patch(self, environment: BaseEnvironment) -> None:
         await self._await_preserving_cancellation(
-            environment.exec(command=self._capture_patch_command())
+            environment.exec(
+                command=self._capture_patch_command(),
+                timeout_sec=self._PATCH_OPERATION_TIMEOUT_SEC,
+            )
         )

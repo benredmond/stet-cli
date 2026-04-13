@@ -186,6 +186,7 @@ class CodexAuthAgentTests(unittest.TestCase):
         self.assertIn("tee -a \"$agent_log\"", run_command.command)
         self.assertIn("--model gpt-5.4", run_command.command)
         self.assertIn("-c model_reasoning_effort=high", run_command.command)
+        self.assertEqual(run_command.timeout_sec, 1800)
         self.assertEqual(run_command.env["OPENAI_BASE_URL"], "https://example.invalid/v1")
         self.assertIn("CODEX_HOME", run_command.env)
 

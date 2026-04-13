@@ -124,6 +124,9 @@ Rules for the optimizer:
   repo-local `rubrics/*.yaml` graders. For plan/research grading, write or
   select a custom rubric first; read
   [rubric-authoring](references/rubric-authoring.md).
+- For first-time repo setup, ask once for the quality-grader posture before
+  non-interactive init or the first smoke/probe/eval: recommended, standard, or
+  custom. See [onboarding](references/onboarding.md).
 - For compare-backed diagnosis, prefer `decision_receipt.tasks[*]` issue
   summaries, risks, grader coverage, and task flips before opening per-task
   artifacts by hand.
@@ -267,6 +270,12 @@ models, setting up a repo, improving a skill, or checking a release?"
   `ANTHROPIC_AUTH_TOKEN`, or the macOS Keychain item named
   `Claude Code-credentials`, and fails before launching Claude when none are
   available.
+- Commercial access control gates only `stet eval rules` in v1. If a user hits
+  a Stet license/trial denial, direct them to `stet auth login` and use
+  `stet auth status` to confirm email, entitlement, trial expiration, and
+  commercial workflow availability. Preserve local command guidance for ungated
+  flows such as `suite discover`, `suite build`, `eval smoke`, `eval status`,
+  `eval report`, and local artifact inspection.
 - In cost-constrained compare or baseline-first workflows, check `stet context --json` first and inspect `artifact_reuse` before proposing a fresh eval. Reuse an exact comparable root when one exists; when that root is likely to anchor repeated candidate work, freeze it as a baseline before the next compare. If only a near match exists, explain the drift explicitly before spending more.
 - For model, reasoning-level, or harness-setting selection on a repo with Stet
   history, run `stet context --repo <repo> --json` before proposing a fresh

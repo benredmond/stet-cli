@@ -225,6 +225,7 @@ class ClaudeCodeAuthAgentTests(unittest.TestCase):
 
         self.assertEqual(len(environment.commands), 1)
         self.assertIn("tar --exclude=.git -cf - .", environment.commands[0])
+        self.assertEqual(environment.execs[0]["timeout_sec"], 1800)
 
     def test_run_captures_patch_even_when_agent_run_fails(self):
         agent = self.module.ClaudeCodeAuthAgent()
@@ -237,6 +238,14 @@ class ClaudeCodeAuthAgentTests(unittest.TestCase):
 
         self.assertEqual(len(environment.commands), 1)
         self.assertIn("/logs/agent/agent.patch", environment.commands[0])
+        self.assertEqual(environment.execs[0]["timeout_sec"], 1800)
+
+    def test_run_commands_use_extended_agent_timeout_floor(self):
+        agent = self.module.ClaudeCodeAuthAgent()
+
+        commands = agent.create_run_agent_commands("fix it")
+
+        self.assertEqual(commands[0].timeout_sec, 1800)
 
     def test_imports_when_harbor_base_does_not_export_execinput(self):
         install_fake_harbor_modules(with_exec_input=False)
@@ -267,6 +276,8 @@ class ClaudeCodeAuthAgentTests(unittest.TestCase):
         setup_exec = environment.execs[0]
         run_exec = environment.execs[1]
         self.assertIn("mkdir -p $CLAUDE_CONFIG_DIR", setup_exec["command"])
+        self.assertEqual(setup_exec["timeout_sec"], 1800)
+        self.assertEqual(run_exec["timeout_sec"], 1800)
         self.assertIn("CLAUDE_CODE_CREDENTIALS_JSON_B64", setup_exec["command"])
         self.assertIn(
             "CLAUDE_CODE_CREDENTIALS_JSON_B64",

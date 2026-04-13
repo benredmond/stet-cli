@@ -88,22 +88,24 @@ fi
     def create_run_agent_commands(self, instruction: str) -> list[ExecInput]:
         commands = super().create_run_agent_commands(instruction)
         credential_env = self._credential_env()
-        if not commands or not credential_env:
+        if not commands:
             return commands
 
         updated_commands: list[ExecInput] = []
         for index, command in enumerate(commands):
             merged_env = dict(command.env or {})
-            merged_env.update(credential_env)
+            if credential_env:
+                merged_env.update(credential_env)
+            final_env = merged_env if command.env is not None or credential_env else None
             updated_command = command.command
-            if index == 0:
+            if index == 0 and credential_env:
                 updated_command = f"{self._credential_bootstrap_command()} && {updated_command}"
             updated_commands.append(
                 ExecInput(
                     command=updated_command,
                     cwd=command.cwd,
-                    env=merged_env,
-                    timeout_sec=command.timeout_sec,
+                    env=final_env,
+                    timeout_sec=self._extended_agent_timeout(command.timeout_sec),
                 )
             )
 
@@ -131,7 +133,7 @@ fi
             command=command,
             env=env,
             cwd=cwd,
-            timeout_sec=timeout_sec,
+            timeout_sec=self._extended_agent_timeout(timeout_sec),
         )
 
     async def setup(self, environment: BaseEnvironment) -> None:

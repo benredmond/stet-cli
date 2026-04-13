@@ -116,6 +116,28 @@ environment:
   dockerfile: .stet/harbor.Dockerfile
 ```
 
+If Harbor needs larger pods, keep the same Dockerfile and add Harbor resource
+overrides under `runner.tb_args`:
+
+```yaml
+runner:
+  tb_cmd:
+    - harbor
+  tb_args:
+    - --override-memory-mb
+    - "8192"
+    - --override-cpus
+    - "2"
+```
+
+Use this for `ENOMEM` / OOMKilled failures during agent setup, including
+Claude Code installation. Prefer `8192` MB first, then `16384` MB if the
+install still OOMs.
+
+For suite-backed rules runs, reference the same harness from `stet.suite.yaml`
+under `eval.harness` (scalar path or `manifest:` object). Do not add `runner:`
+to `stet.yaml`; runner settings live in `stet.harness/v1`.
+
 **CHECKPOINT: Show the drafted Harbor Dockerfile, harness manifest, and test command with CI references. Proceed on approval.**
 
 ## Phase 2: Iterate to Green
@@ -143,7 +165,7 @@ Debug loop (up to 5 attempts). Ordered by frequency:
 | `ConnectionError` / `fetch failed` | network_flake | Add retry config / package manager setup to the Dockerfile |
 | `ENOENT` from setup hacks on old commits | path_drift | Simplify the Dockerfile; avoid commit-fragile file mutations when possible |
 | vitest/jest per-test timeout | test_config | Prefer durable repo/env setup; patch configs only if CI already does something similar |
-| `ENOMEM` / OOM killed | resource_limit | Reduce `--workers` to 1; reduce test parallelism |
+| `ENOMEM` / OOM killed | resource_limit | Increase Harbor memory with `runner.tb_args` / `--tb-arg "--override-memory-mb 8192"`; reduce `--workers` or `--tb-concurrency` if several pods exhaust the node |
 | Docker daemon errors | infra_error | Check `docker ps`, kill zombies, retry |
 | Lockfile version mismatch | lockfile_drift | Pin package manager version in `.stet/harbor.Dockerfile` |
 

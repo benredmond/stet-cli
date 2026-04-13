@@ -40,16 +40,29 @@ For most repos, the quick path is enough:
 #    Run `claude setup-token`, then export CLAUDE_CODE_OAUTH_TOKEN with the
 #    printed token. Stet fails before launching Claude runs if auth is missing.
 
-# 4. Persist config
+# 4. Ask the operator which first-run quality posture to use
+#    [r] recommended: discipline bundle + intentionality
+#    [s] standard: repo tests plus default coding graders only
+#    [c] custom: inspect `stet graders --repo . --json`, then choose
+
+# 5. Persist config
 stet init --repo . --yes --test "<repo test cmd>"
 
-# 5. Mine candidate pool
+# If the operator chose [r] while using --yes automation, ensure stet.yaml
+# contains:
+# quality:
+#   bundles:
+#     - discipline
+#   include_graders:
+#     - intentionality
+
+# 6. Mine candidate pool
 stet suite discover --repo . --rev-range main~50..main --output discover-manifest.yaml
 
-# 6. Build dataset
+# 7. Build dataset
 stet suite build --repo . --manifest discover-manifest.yaml --out ./stet-dataset
 
-# 7. Read receipt and propose starter slice
+# 8. Read receipt and propose starter slice
 # Build writes onboarding_receipt.v1.json to the dataset root.
 ```
 
@@ -70,6 +83,10 @@ Quality onboarding rules:
 - Interactive `stet init` now recommends enabling the `discipline` bundle plus
   `intentionality` as an extra grader. Accepting that prompt writes the repo
   `quality` selection into `stet.yaml`.
+- Before any automated setup that would use `stet init --yes`, ask the
+  operator for the first-run quality-grader posture: `[r] recommended`
+  `discipline` + `intentionality`, `[s] standard` with no repo quality bundle,
+  or `[c] custom` after inspecting `stet graders --repo <path> --json`.
 - `stet init --ai-provider claude` requires usable Claude auth. Prefer
   `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`; Stet also accepts
   Claude credential JSON, Anthropic API/auth token env vars, or the macOS
@@ -77,6 +94,10 @@ Quality onboarding rules:
 - `stet init --yes` stays low-friction and does not enable quality bundles by
   default. Silent auto-init paths should keep bundle selection empty until an
   operator opts in.
+- Do not launch the first smoke, probe, or eval run while the repo has no
+  `quality:` block, `--grader`, or explicit operator decline. If the operator
+  chooses the recommended posture, write the `quality:` selection before the
+  run or pass equivalent explicit graders where the command supports them.
 
 ## Onboarding Receipt
 
@@ -125,7 +146,8 @@ then        [s] stop      keep the recommendation only
 ## Flow-Specific Actions
 
 - `[a] approve`: accept the proposed starter slice; slice is locked for probe.
-- `[m] smoke`: run `stet eval smoke --dataset ./stet-dataset --models "..." --json`
+- `[m] smoke`: after quality posture is resolved, run
+  `stet eval smoke --dataset ./stet-dataset --models "..." --json`
 - `[p] probe`: approve and immediately launch
   `stet probe --dataset ./stet-dataset --model "..." --json`
 

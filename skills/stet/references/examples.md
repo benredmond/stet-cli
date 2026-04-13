@@ -174,8 +174,12 @@ Agent inspects CI (`.github/workflows/test.yml`), finds `npm test`, then
 authors `.stet/harbor.Dockerfile` and `.stet/stet.harness.yaml` with
 `environment.dockerfile: .stet/harbor.Dockerfile`.
 
+Agent asks once for the first-run quality posture. User chooses recommended.
+
 ```bash
 stet init --repo . --yes --test "npm test"
+# Agent ensures stet.yaml contains quality.bundles=[discipline] and
+# quality.include_graders=[intentionality] before launching smoke/probe/eval.
 stet suite discover --repo . --rev-range main~50..main --output discover-manifest.yaml
 stet suite build --repo . --manifest discover-manifest.yaml --out ./stet-dataset
 ```
