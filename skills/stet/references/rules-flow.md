@@ -37,7 +37,7 @@ Roles:
 - `manifest resolve`: inspect normalized inputs before launch
 - `eval rules`: launch the bounded rules-backed run
 - `eval status`: explain the current phase or health
-- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the candidate surface is replayable, it can rerun a missing or partial candidate arm while preserving completed baseline evidence, then repair/regrade missing coverage
+- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage
 - `eval report`: read the finished rollout decision
 
 `stet eval rules` is non-destructive by default when a matching rules runtime
@@ -130,7 +130,7 @@ then        [s] stop        keep the verdict without changing rollout state
 Flow-specific action:
 - `[p] promote`: `stet promote --change-manifest stet.change.yaml --reason "..."`
 - `[P] promote override`: `stet promote --change-manifest stet.change.yaml --reason "..." --allow-inspect` when trust remains `inspect` and the operator is intentionally overriding the gate
-- `[c] resume compare`: `stet eval rules resume --change-manifest stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because resume reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md candidate overlays from the change manifest
+- `[c] resume compare`: `stet eval rules resume --change-manifest stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because resume reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md overlays from the change manifest
 - `[r] restart`: `stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml --restart` only when the operator intentionally discards existing rules evidence for that change manifest
 
 ## Running Rules Check-In
