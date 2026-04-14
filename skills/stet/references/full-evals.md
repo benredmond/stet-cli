@@ -61,7 +61,7 @@ STET :: BUILD STATUS
 step        suite build
 state       running
 health      active
-root        .tmp/stet-dataset
+root        .stet/dataset
 progress    12/34 tasks materialized
 eta         unknown
 confidence  medium
@@ -92,11 +92,11 @@ Smoke and run summaries should always state:
 
 ```bash
 stet init --repo . --test "<repo test cmd>"
-stet suite discover --repo . --rev-range main~50..main --output discover-manifest.yaml
-stet suite build --repo . --manifest discover-manifest.yaml --out ./stet-dataset --workers 4
-stet eval run --dataset ./stet-dataset --models "opus 4.6,sonnet 4.6" --out ./eval-output
-stet eval status --out ./eval-output --json
-stet eval report --out ./eval-output --json
+stet suite discover --repo . --rev-range main~50..main
+stet suite build --repo . --manifest .stet/discover-manifest.yaml --workers 4
+stet eval run --dataset .stet/dataset --models "opus 4.6,sonnet 4.6" --out .stet/eval-output
+stet eval status --out .stet/eval-output --json
+stet eval report --out .stet/eval-output --json
 ```
 
 Machine-readable default:
@@ -138,10 +138,10 @@ Use this when the repo already has change and suite manifests and the operator
 wants a formal change-control path.
 
 ```bash
-stet manifest resolve --change-manifest stet.change.yaml
-stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml
-stet eval status --change-manifest stet.change.yaml --json
-stet eval report --change-manifest stet.change.yaml --json
+stet manifest resolve --change-manifest .stet/rules/stet.change.yaml
+stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml
+stet eval status --change-manifest .stet/rules/stet.change.yaml --json
+stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 ## Rules

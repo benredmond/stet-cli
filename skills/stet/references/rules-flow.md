@@ -26,11 +26,11 @@ the rules run or prove custom `agents_*` grader coverage.
 ## Flow
 
 ```bash
-stet manifest resolve --change-manifest stet.change.yaml
-stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml
-stet eval status --change-manifest stet.change.yaml --json
-stet eval rules resume --change-manifest stet.change.yaml --json
-stet eval report --change-manifest stet.change.yaml --json
+stet manifest resolve --change-manifest .stet/rules/stet.change.yaml
+stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml
+stet eval status --change-manifest .stet/rules/stet.change.yaml --json
+stet eval rules resume --change-manifest .stet/rules/stet.change.yaml --json
+stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 Roles:
@@ -69,7 +69,7 @@ stet eval report --change-manifest .stet/skill-loops/planner/stet.change.yaml --
 ```
 
 The wrapper writes:
-- `stet.change.yaml` with a single `skill_diff` treatment
+- `.stet/skill-loops/<name>/stet.change.yaml` with a single `skill_diff` treatment
 - `stet.search_space.yaml` with treatments as the only mutable lever
 - `stet.suite.yaml` and a replay dataset under `dataset/`
 
@@ -118,7 +118,7 @@ compare     candidate vs baseline
 sample      32 tasks
 delta       pass +1pp  equiv +5pp  cost -8%
 driver      candidate improves equivalence and cost without failing guardrails
-evidence    stet.change.yaml
+evidence    .stet/rules/stet.change.yaml
 why         Promote is next because this is already the formal rollout
             decision surface, and promotion persists that state.
 
@@ -128,11 +128,11 @@ then        [s] stop        keep the verdict without changing rollout state
 ```
 
 Flow-specific action:
-- `[p] promote`: `stet promote --change-manifest stet.change.yaml --reason "..."`
-- `[P] promote override`: `stet promote --change-manifest stet.change.yaml --reason "..." --allow-inspect` when trust remains `inspect` and the operator is intentionally overriding the gate
-- `[c] resume compare`: `stet eval rules resume --change-manifest stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because resume reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md overlays from the change manifest
+- `[p] promote`: `stet promote --change-manifest .stet/rules/stet.change.yaml --reason "..."`
+- `[P] promote override`: `stet promote --change-manifest .stet/rules/stet.change.yaml --reason "..." --allow-inspect` when trust remains `inspect` and the operator is intentionally overriding the gate
+- `[c] resume compare`: `stet eval rules resume --change-manifest .stet/rules/stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because resume reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md overlays from the change manifest
 - `[g] retry graders`: use the `repair-ai-coverage` or `regrade-graders` command emitted by report/status; add `--parse-retries N` for saved grader prompts that failed JSON/schema parsing
-- `[r] restart`: `stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml --restart` only when the operator intentionally discards existing rules evidence for that change manifest
+- `[r] restart`: `stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml --restart` only when the operator intentionally discards existing rules evidence for that change manifest
 
 ## Running Rules Check-In
 
@@ -211,7 +211,7 @@ synchronously than the baseline. Lower `--tb-concurrency` to `2` and use
 This applies the same runner config to both arms. It is runtime config, not the
 candidate treatment. Use `change.rules.harness` only with a `harness_bundle`
 treatment when the harness itself is the thing being evaluated. Do not add
-`runner:` to `stet.yaml`.
+`runner:` to `.stet/stet.yaml`.
 
 When you already froze the baseline evidence with `stet baseline freeze`, replace
 `baseline_model` with the benchmark baseline reference:
@@ -233,10 +233,10 @@ candidate arm fresh, applies candidate-side treatments and overlays, records
 ```bash
 # Edit AGENTS.md or CLAUDE.md (don't commit yet)
 stet eval rules \
-  --change-manifest stet.change.yaml \
-  --suite-manifest stet.suite.yaml
-stet eval status --change-manifest stet.change.yaml
-stet eval report --change-manifest stet.change.yaml --json
+  --change-manifest .stet/rules/stet.change.yaml \
+  --suite-manifest .stet/rules/stet.suite.yaml
+stet eval status --change-manifest .stet/rules/stet.change.yaml
+stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 CLI `--baseline .stet/baselines/my-capability.json` may override the suite

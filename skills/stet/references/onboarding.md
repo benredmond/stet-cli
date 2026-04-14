@@ -20,7 +20,7 @@ read CI ──► init ──► discover ──► build ──► receipt
 - "Onboard this repo for evals"
 - "Set up Stet on this repo"
 - "Build a dataset from this repo"
-- First time on a repo with no `stet.yaml`
+- First time on a repo with no `.stet/stet.yaml`
 - User wants a reusable task slice before running probes or comparisons
 
 ## Quick Path
@@ -48,7 +48,7 @@ For most repos, the quick path is enough:
 # 5. Persist config
 stet init --repo . --yes --test "<repo test cmd>"
 
-# If the operator chose [r] while using --yes automation, ensure stet.yaml
+# If the operator chose [r] while using --yes automation, ensure .stet/stet.yaml
 # contains:
 # quality:
 #   bundles:
@@ -57,10 +57,10 @@ stet init --repo . --yes --test "<repo test cmd>"
 #     - intentionality
 
 # 6. Mine candidate pool
-stet suite discover --repo . --rev-range main~50..main --output discover-manifest.yaml
+stet suite discover --repo . --rev-range main~50..main
 
 # 7. Build dataset
-stet suite build --repo . --manifest discover-manifest.yaml --out ./stet-dataset
+stet suite build --repo . --manifest .stet/discover-manifest.yaml
 
 # 8. Read receipt and propose starter slice
 # Build writes onboarding_receipt.v1.json to the dataset root.
@@ -82,7 +82,7 @@ Test-setup rules:
 Quality onboarding rules:
 - Interactive `stet init` now recommends enabling the `discipline` bundle plus
   `intentionality` as an extra grader. Accepting that prompt writes the repo
-  `quality` selection into `stet.yaml`.
+  `quality` selection into `.stet/stet.yaml`.
 - Before any automated setup that would use `stet init --yes`, ask the
   operator for the first-run quality-grader posture: `[r] recommended`
   `discipline` + `intentionality`, `[s] standard` with no repo quality bundle,
@@ -147,9 +147,9 @@ then        [s] stop      keep the recommendation only
 
 - `[a] approve`: accept the proposed starter slice; slice is locked for probe.
 - `[m] smoke`: after quality posture is resolved, run
-  `stet eval smoke --dataset ./stet-dataset --models "..." --json`
+  `stet eval smoke --dataset .stet/dataset --models "..." --json`
 - `[p] probe`: approve and immediately launch
-  `stet probe --dataset ./stet-dataset --model "..." --json`
+  `stet probe --dataset .stet/dataset --model "..." --json`
 
 ## Escalation Handoff
 

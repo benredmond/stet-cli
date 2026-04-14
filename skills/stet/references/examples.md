@@ -12,10 +12,10 @@ Agent routes to: rules flow (`claude_md` treatment).
 Agent reads: `references/rules-flow.md`
 
 ```bash
-stet manifest resolve --change-manifest stet.change.yaml
-stet manifest resolve --suite-manifest stet.suite.yaml
-stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml
-stet eval report --change-manifest stet.change.yaml --json
+stet manifest resolve --change-manifest .stet/rules/stet.change.yaml
+stet manifest resolve --suite-manifest .stet/rules/stet.suite.yaml
+stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml
+stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 Agent reads the Trial Result first: `decision_receipt` for the verdict and next
@@ -35,7 +35,7 @@ compare     candidate (with CLAUDE.md) vs baseline (without)
 sample      8 tasks
 delta       pass +0pp  equiv +12pp  review +4pp
 driver      equivalence improved on 5/8 tasks without review regression
-evidence    stet.change.yaml
+evidence    .stet/rules/stet.change.yaml
 why         Promote is available because this is the formal rollout decision
             surface and the required graders are present.
 
@@ -153,8 +153,8 @@ then        [s] stop        keep only the directional read
 Agent runs the retained candidate through the rules flow:
 
 ```bash
-stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml
-stet eval report --change-manifest stet.change.yaml --json
+stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml
+stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 Done in 5 turns. The inspect -> revise -> rerun cycle recovered a regression,
@@ -178,10 +178,10 @@ Agent asks once for the first-run quality posture. User chooses recommended.
 
 ```bash
 stet init --repo . --yes --test "npm test"
-# Agent ensures stet.yaml contains quality.bundles=[discipline] and
+# Agent ensures .stet/stet.yaml contains quality.bundles=[discipline] and
 # quality.include_graders=[intentionality] before launching smoke/probe/eval.
-stet suite discover --repo . --rev-range main~50..main --output discover-manifest.yaml
-stet suite build --repo . --manifest discover-manifest.yaml --out ./stet-dataset
+stet suite discover --repo . --rev-range main~50..main
+stet suite build --repo . --manifest .stet/discover-manifest.yaml
 ```
 
 Agent reports:
@@ -209,7 +209,7 @@ then        [s] stop        keep the recommendation only
 **User:** `m`
 
 ```bash
-stet eval smoke --dataset ./stet-dataset --models "opus 4.6,sonnet 4.6" --tasks 5 --json
+stet eval smoke --dataset .stet/dataset --models "opus 4.6,sonnet 4.6" --tasks 5 --json
 ```
 
 ```text
@@ -233,7 +233,7 @@ then        [s] stop        keep the directional read
 **User:** `p`
 
 ```bash
-stet probe --dataset ./stet-dataset --model "opus 4.6" --json
+stet probe --dataset .stet/dataset --model "opus 4.6" --json
 stet eval report --out .tmp/stet-probe --json
 ```
 

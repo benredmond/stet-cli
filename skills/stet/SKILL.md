@@ -321,6 +321,9 @@ models, setting up a repo, improving a skill, or checking a release?"
   bundled quality graders after completion, or
   `stet runs regrade-graders --repo <repo> --from-repo-quality` to apply the
   repo `quality:` config without rerunning the harness.
+- Treat accepted AI-generated tests as behavior evidence only after Stet has
+  filtered generated candidates that import internal repo modules or reference
+  internal paths; overfit rejections appear in the testgen verification summary.
 - For incomplete rules-backed compares, prefer `stet eval rules resume
   --change-manifest <stet.change.yaml>` or `--rules-root <dir>` before manually
   constructing sibling arm roots or running repair commands. Do not rerun

@@ -141,7 +141,7 @@ the first.
 Suite-backed rules runs automatically apply `.stet/stet.harness.yaml` when it
 exists. Use `eval.harness` in `stet.suite.yaml` only for a non-default harness
 manifest (scalar path or `manifest:` object). Do not add `runner:` to
-`stet.yaml`; runner settings live in `stet.harness/v1`.
+`.stet/stet.yaml`; runner settings live in `stet.harness/v1`.
 
 **CHECKPOINT: Show the drafted Harbor Dockerfile, harness manifest, and test command with CI references. Proceed on approval.**
 
