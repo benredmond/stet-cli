@@ -45,6 +45,9 @@ or wants a cheap A/B prefilter.
 stet eval config-diff --repo . --file CLAUDE.md --model "sonnet 4.6" --json
 ```
 
+Add `--agent <provider>` with `--ai-cmd` only when you need to override the
+runtime provider that Stet would infer from the model and repo config.
+
 Or with explicit files:
 
 ```bash

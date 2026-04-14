@@ -131,6 +131,7 @@ Flow-specific action:
 - `[p] promote`: `stet promote --change-manifest stet.change.yaml --reason "..."`
 - `[P] promote override`: `stet promote --change-manifest stet.change.yaml --reason "..." --allow-inspect` when trust remains `inspect` and the operator is intentionally overriding the gate
 - `[c] resume compare`: `stet eval rules resume --change-manifest stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because resume reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md overlays from the change manifest
+- `[g] retry graders`: use the `repair-ai-coverage` or `regrade-graders` command emitted by report/status; add `--parse-retries N` for saved grader prompts that failed JSON/schema parsing
 - `[r] restart`: `stet eval rules --change-manifest stet.change.yaml --suite-manifest stet.suite.yaml --restart` only when the operator intentionally discards existing rules evidence for that change manifest
 
 ## Running Rules Check-In

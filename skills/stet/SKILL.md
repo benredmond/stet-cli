@@ -313,16 +313,24 @@ models, setting up a repo, improving a skill, or checking a release?"
   the ordered recovery commands projected by `stet eval status` /
   `stet eval report` over manual artifact inspection. Use the surfaced
   `stet runs repair-ai-coverage ...` step before `stet runs regrade-graders ...`
-  when both built-in AI coverage and custom rubric coverage are missing.
+  when both built-in AI coverage and additive quality coverage are missing.
+  Add `--parse-retries N` to either command when saved prompts exist but grader
+  JSON/schema parsing failed; use task-scoped `--task-id` values from the
+  report/status output instead of deleting cached validation artifacts.
+  Use `stet runs regrade-graders --grader craft --grader discipline` to add
+  bundled quality graders after completion, or
+  `stet runs regrade-graders --repo <repo> --from-repo-quality` to apply the
+  repo `quality:` config without rerunning the harness.
 - For incomplete rules-backed compares, prefer `stet eval rules resume
   --change-manifest <stet.change.yaml>` or `--rules-root <dir>` before manually
   constructing sibling arm roots or running repair commands. Do not rerun
   `stet eval rules` to recover partial evidence; use `--restart` only when the
   operator intentionally discards existing evidence for that change manifest.
-- For AGENTS.md, CLAUDE.md, skill, or policy compares where custom graders are
-  part of the decision, verify the expected custom grader IDs are present in
+- For AGENTS.md, CLAUDE.md, skill, or policy compares where custom, bundled, or
+  repo-configured quality graders are part of the decision, verify the expected
+  grader IDs are present in
   `decision_receipt.compare.grader_coverage`, `experiment.json.graders`, or arm
-  `decision_metrics.graders` before issuing a verdict. If custom grader
+  `decision_metrics.graders` before issuing a verdict. If expected grader
   coverage is missing, report the evidence gap and fail closed to `inspect`.
 - For run/model comparison surfaces, prefer `runs.<model>.decision_metrics`
   and `decision_metrics.graders` over legacy `validation_metrics` or scraping

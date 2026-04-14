@@ -114,6 +114,10 @@ Path preservation rule:
   `stet runs regrade-graders`, keep the original `--grader /path/to/rubric.yaml`
   argument on follow-up commands instead of replacing it with the resolved
   grader ID.
+- Bundled quality graders are stable by ID. Use `--grader craft`,
+  `--grader discipline`, or `--from-repo-quality` when adding those graders to
+  a completed run; the path preservation rule applies only to custom rubric
+  YAML files.
 
 Task-detail grader context:
 - Custom task-detail graders receive bounded `task_detail.json.grader_context`

@@ -157,10 +157,11 @@ Machine-readable default:
   fields before summarizing a winner.
 - Within `decision_receipt.compare`, prefer `failure_taxonomy`,
   `grader_coverage`, and `task_flips` before scraping per-task artifacts.
-- For AGENTS.md, CLAUDE.md, skill, or policy compares where custom graders are
-  expected, verify those grader IDs survived into `grader_coverage`,
+- For AGENTS.md, CLAUDE.md, skill, or policy compares where custom, bundled, or
+  repo-configured quality graders are expected, verify those grader IDs survived
+  into `grader_coverage`,
   `experiment.json.graders`, or arm `decision_metrics.graders` before giving a
-  final verdict. If built-in compare signals exist but the expected custom
+  final verdict. If built-in compare signals exist but the expected additive
   graders are absent, treat the result as degraded evidence and fail closed to
   `inspect`.
 - For custom rubric compares, keep the exact rubric file path in follow-up
@@ -168,6 +169,11 @@ Machine-readable default:
   `--grader /path/to/custom.yaml`, reruns, config-diff repros, and
   `stet runs regrade-graders` should keep that same path rather than replacing
   it with the resolved grader ID.
+- To add bundled or repo-configured quality graders after completion, use
+  `stet runs regrade-graders --grader craft --grader discipline` or
+  `stet runs regrade-graders --repo <repo> --from-repo-quality`; this preserves
+  the completed harness/test evidence and regenerates run summaries from
+  canonical task details.
 - If `validity` is partial/invalid, `evidence_quality` is degraded/insufficient,
   or status/report surfaces contradict each other, lower confidence and fail
   closed to `inspect`.
@@ -313,11 +319,14 @@ Recovery rules:
   candidate digest still matches the persisted runtime.
 - When the compare root projects recoverable requested grader gaps, follow the
   surfaced ordered sequence on the existing commands: `stet runs repair-ai-coverage`
-  for missing built-in AI coverage, then `stet runs regrade-graders` for custom
-  rubric gaps, then re-check with `stet eval status` / `stet eval report`.
+  for missing built-in AI coverage, then `stet runs regrade-graders` for custom,
+  bundled, or repo-configured quality gaps, then re-check with
+  `stet eval status` / `stet eval report`.
   Those repair steps preserve compare-critical metadata and existing custom
   grader surfaces so the arm stays compare-compatible while recovering
-  coverage. Keep the original custom rubric file path on the regrade command.
+  coverage. Add `--parse-retries N` when saved grader prompts failed
+  JSON/schema parsing. Keep the original custom rubric file path on the regrade
+  command.
 - If `stet runs repair-ai-coverage --cr-only` still leaves `code_review`
   unresolved, use the summary's stable `unresolved[].reason` and optional
   `category`/`detail` fields to separate `model_output_shape`,
