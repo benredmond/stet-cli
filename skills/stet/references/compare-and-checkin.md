@@ -306,12 +306,11 @@ Recovery rules:
 - For rules-backed compares, `[c] resume compare` should start with
   `stet eval rules resume --change-manifest <stet.change.yaml> --json` or
   `--rules-root <dir>` so Stet reuses the persisted runtime and arm artifacts.
-- If the candidate arm is missing or has incomplete harness results, resume
-  reruns only that candidate arm when the persisted runtime can replay the
-  candidate surface, then rebuilds compare evidence. Do not delete the compare
-  root just to recover a candidate OOM/rate-limit interruption; if resume
-  reports `unsupported_candidate_rerun`, relaunch from the change manifest so
-  file or skill overlays are applied exactly.
+- If an arm is missing tasks or has retryable harness failures, resume reruns
+  only those tasks, then rebuilds compare evidence. Do not delete the compare
+  root just to recover an OOM/rate-limit interruption; file-backed
+  AGENTS.md/CLAUDE.md treatments are replayed from the change manifest when the
+  candidate digest still matches the persisted runtime.
 - When the compare root projects recoverable requested grader gaps, follow the
   surfaced ordered sequence on the existing commands: `stet runs repair-ai-coverage`
   for missing built-in AI coverage, then `stet runs regrade-graders` for custom

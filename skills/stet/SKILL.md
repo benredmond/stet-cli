@@ -316,7 +316,9 @@ models, setting up a repo, improving a skill, or checking a release?"
   when both built-in AI coverage and custom rubric coverage are missing.
 - For incomplete rules-backed compares, prefer `stet eval rules resume
   --change-manifest <stet.change.yaml>` or `--rules-root <dir>` before manually
-  constructing sibling arm roots or running repair commands.
+  constructing sibling arm roots or running repair commands. Do not rerun
+  `stet eval rules` to recover partial evidence; use `--restart` only when the
+  operator intentionally discards existing evidence for that change manifest.
 - For AGENTS.md, CLAUDE.md, skill, or policy compares where custom graders are
   part of the decision, verify the expected custom grader IDs are present in
   `decision_receipt.compare.grader_coverage`, `experiment.json.graders`, or arm

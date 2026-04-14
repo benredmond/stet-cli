@@ -133,6 +133,9 @@ evidence on the release. It is not just a status read.
 Do not pass a baseline snapshot to `stet monitor run --release ...`. Baseline
 snapshots stop at compare or gate; monitor remains release-only.
 
+Release paths must point to regular release artifact files. Treat symlinked
+`release.v1.json` paths as invalid rather than lifecycle authority.
+
 Replay contract:
 - `monitor run` should be explained as replaying the promoted release's frozen
   `task_selection` and arm provenance, not rediscovering tasks from the current

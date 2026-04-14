@@ -143,6 +143,10 @@ Then inspect the weakest dimension:
 stet eval workbench risks --grades-dir ./stet-skill-eval/graded/candidate --weakest --json
 ```
 
+Artifact batch-grade directories must be flat and use filenames of the form
+`<task-id>.md`; the derived task ID must be non-empty and must not traverse out
+of the task output directory.
+
 ## Existing Examples
 
 Start from checked-in rubrics instead of inventing format from scratch:
