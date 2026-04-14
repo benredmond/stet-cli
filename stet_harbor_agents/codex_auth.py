@@ -23,7 +23,7 @@ class CodexAuthAgent(AgentPatchCaptureMixin, Codex):
     _BOOTSTRAP_STATUS_FAILED = "failed"
     _BOOTSTRAP_FAILURE_CLASS_OPTIONAL_DEP = "codex_optional_dependency_missing"
     _BOOTSTRAP_FAILURE_CLASS_SETUP = "agent_setup_failed"
-    _OPTIONAL_DEPENDENCY_SIGNATURE = "Missing optional dependency @openai/codex-linux-arm64"
+    _OPTIONAL_DEPENDENCY_SIGNATURE = "Missing optional dependency @openai/codex-linux-"
 
     def __init__(
         self,

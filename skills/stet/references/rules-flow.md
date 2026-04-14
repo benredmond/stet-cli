@@ -37,7 +37,7 @@ Roles:
 - `manifest resolve`: inspect normalized inputs before launch
 - `eval rules`: launch the bounded rules-backed run
 - `eval status`: explain the current phase or health
-- `eval rules resume`: recover an incomplete rules compare from existing arm artifacts
+- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the candidate surface is replayable, it can rerun a missing or partial candidate arm while preserving completed baseline evidence, then repair/regrade missing coverage
 - `eval report`: read the finished rollout decision
 
 ## Shared Skill Wrapper
@@ -122,7 +122,7 @@ then        [s] stop        keep the verdict without changing rollout state
 Flow-specific action:
 - `[p] promote`: `stet promote --change-manifest stet.change.yaml --reason "..."`
 - `[P] promote override`: `stet promote --change-manifest stet.change.yaml --reason "..." --allow-inspect` when trust remains `inspect` and the operator is intentionally overriding the gate
-- `[c] resume compare`: `stet eval rules resume --change-manifest stet.change.yaml --json` when the runtime has existing compare arms but the canonical Trial Result is incomplete
+- `[c] resume compare`: `stet eval rules resume --change-manifest stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for candidate OOM/rate-limit interruptions before deleting the compare root, and relaunch only if resume reports that the candidate treatment cannot be replayed
 
 ## Running Rules Check-In
 

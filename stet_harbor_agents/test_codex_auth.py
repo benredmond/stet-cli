@@ -214,6 +214,29 @@ class CodexAuthAgentTests(unittest.TestCase):
             marker["failure_class"], "codex_optional_dependency_missing"
         )
 
+    def test_setup_failure_classifies_x64_optional_dependency_marker(self):
+        agent = self.module.CodexAuthAgent(
+            model_name="openai/gpt-5.4",
+            auth_path=str(self.auth_file),
+        )
+        agent._should_fail_setup = (
+            "Missing optional dependency @openai/codex-linux-x64"
+        )
+        environment = sys.modules["harbor.environments.base"].BaseEnvironment()
+
+        with self.assertRaises(RuntimeError):
+            asyncio.run(agent.setup(environment))
+
+        marker_path = self.module.EnvironmentPaths.agent_dir / agent._OUTPUT_FILENAME
+        marker = json.loads(
+            marker_path.read_text(encoding="utf-8").strip().splitlines()[-1]
+        )
+        self.assertEqual(marker["type"], "stet.bootstrap")
+        self.assertEqual(marker["status"], "failed")
+        self.assertEqual(
+            marker["failure_class"], "codex_optional_dependency_missing"
+        )
+
     def test_imports_when_harbor_base_does_not_export_execinput(self):
         install_fake_harbor_modules(with_exec_input=False)
         sys.modules.pop("stet_harbor_agents.compat", None)

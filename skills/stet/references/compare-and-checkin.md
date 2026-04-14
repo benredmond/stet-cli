@@ -291,8 +291,9 @@ Use recovery when evidence is incomplete or partially degraded.
 
 Flow-specific recovery actions:
 - `[p] repair`: repair missing quality evidence without full rerun
-- `[c] resume compare`: finish requested grader coverage for incomplete compare
-  without recomputing completed arm work
+- `[c] resume compare`: recover an incomplete rules compare without
+  recomputing completed baseline work; this can rerun a missing or partial
+  candidate arm before repairing requested grader coverage
 - `[g] retry grader`: finish retryable artifact-graded task; checks
   `validation/<model_key>/<task_id>/task_decision.json`
 - `[t] revalidate`: rerun tests only when that is the missing signal
@@ -305,6 +306,12 @@ Recovery rules:
 - For rules-backed compares, `[c] resume compare` should start with
   `stet eval rules resume --change-manifest <stet.change.yaml> --json` or
   `--rules-root <dir>` so Stet reuses the persisted runtime and arm artifacts.
+- If the candidate arm is missing or has incomplete harness results, resume
+  reruns only that candidate arm when the persisted runtime can replay the
+  candidate surface, then rebuilds compare evidence. Do not delete the compare
+  root just to recover a candidate OOM/rate-limit interruption; if resume
+  reports `unsupported_candidate_rerun`, relaunch from the change manifest so
+  file or skill overlays are applied exactly.
 - When the compare root projects recoverable requested grader gaps, follow the
   surfaced ordered sequence on the existing commands: `stet runs repair-ai-coverage`
   for missing built-in AI coverage, then `stet runs regrade-graders` for custom
