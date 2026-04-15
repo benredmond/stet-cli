@@ -4,11 +4,11 @@ Inherits [operator-contract](operator-contract.md) for receipt format and
 shared keyed actions.
 
 ```
-manifest resolve ──► eval rules ──► status ──► report
-                                      │          │
-                                  [w] wait   [p] promote  [i] inspect  [s] stop
-                                      │
-                                  [c] resume compare
+manifest resolve ──► eval rules plan ──► eval rules ──► status ──► report
+                                                        │          │
+                                                    [w] wait   [p] promote  [i] inspect  [s] stop
+                                                        │
+                                                    [c] resume compare
 ```
 
 Use this for manifest-backed change control.
@@ -27,6 +27,7 @@ the rules run or prove custom `agents_*` grader coverage.
 
 ```bash
 stet manifest resolve --change-manifest .stet/rules/stet.change.yaml
+stet eval rules plan --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml --json
 stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml
 stet eval status --change-manifest .stet/rules/stet.change.yaml --json
 stet eval rules resume --change-manifest .stet/rules/stet.change.yaml --json
@@ -35,6 +36,7 @@ stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 
 Roles:
 - `manifest resolve`: inspect normalized inputs before launch
+- `eval rules plan`: preflight tasks, arms, graders, frozen-baseline reuse, cost confidence, missing pricing/cost data, and cheaper alternatives without writing runtime artifacts or launching evaluator work
 - `eval rules`: launch the bounded rules-backed run
 - `eval status`: explain the current phase or health
 - `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage
@@ -47,6 +49,28 @@ partial arm evidence. Use `stet eval status --change-manifest ...` before any
 recovery decision, then `stet eval rules resume --change-manifest ... --json`
 when the active process has exited or status is stalled. Use `--restart` only
 when intentionally discarding existing evidence and starting over.
+
+Fresh rules runs use the same bounded preflight policy as `stet eval run`: one
+representative smoke pre-pass before canonical work, not one smoke run per arm.
+Candidate arms are preferred over baseline arms for that single smoke. Successful
+smoke artifacts are seeded into the canonical root so smoked tasks count toward
+the full run.
+
+## Default Quality Graders
+
+For non-skill treatments (AGENTS.md, CLAUDE.md, model_update, harness_bundle,
+docs_glob), `eval rules` automatically includes the repo's quality graders from
+`stet.yaml` `quality:` config, or the recommended default (`discipline` bundle +
+`intentionality`) when no quality config exists. This ensures decision-grade
+evidence on the first run without requiring post-hoc `regrade-graders`.
+
+Use `--no-quality` to suppress automatic quality grader inclusion.
+
+Skill treatments (`skill_diff`) do not receive bundled quality graders; they use
+the `skill_workbench` pack instead (see below).
+
+Missing expected quality graders produce an `inspect` verdict with a concrete
+`regrade-graders` repair command.
 
 ## Shared Skill Wrapper
 
@@ -61,12 +85,26 @@ stet eval rules skill \
   --goal "improve planning specificity without increasing scope risk" \
   --out .stet/skill-loops/planner \
   --tasks 12 \
+  --plan \
+  --json
+
+stet eval rules skill \
+  --skill .agents/skills/planner/SKILL.md \
+  --repo . \
+  --model claude-sonnet-4-20250514 \
+  --goal "improve planning specificity without increasing scope risk" \
+  --out .stet/skill-loops/planner \
+  --tasks 12 \
   --test "go test ./..." \
   --json
 
 stet eval status --change-manifest .stet/skill-loops/planner/stet.change.yaml --json
 stet eval report --change-manifest .stet/skill-loops/planner/stet.change.yaml --json
 ```
+
+Use the `--plan` form before launch when the operator needs a budget decision;
+it does not write the wrapper bundle, build the replay dataset, or launch
+`eval rules`.
 
 The wrapper writes:
 - `.stet/skill-loops/<name>/stet.change.yaml` with a single `skill_diff` treatment

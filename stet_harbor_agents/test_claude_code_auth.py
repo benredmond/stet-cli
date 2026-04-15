@@ -200,6 +200,22 @@ class ClaudeCodeAuthAgentTests(unittest.TestCase):
             os.environ["CLAUDE_CODE_CREDENTIALS_JSON_B64"],
         )
 
+    def test_reasoning_effort_sets_claude_code_effort_level(self):
+        agent = self.module.ClaudeCodeAuthAgent(reasoning_effort="high")
+
+        self.assertEqual(agent._reasoning_env(), {"CLAUDE_CODE_EFFORT_LEVEL": "high"})
+
+    def test_xhigh_reasoning_effort_maps_to_claude_code_max(self):
+        agent = self.module.ClaudeCodeAuthAgent(reasoning_effort="xhigh")
+
+        self.assertEqual(agent._reasoning_env(), {"CLAUDE_CODE_EFFORT_LEVEL": "max"})
+
+    def test_invalid_reasoning_effort_is_rejected(self):
+        agent = self.module.ClaudeCodeAuthAgent(reasoning_effort="huge")
+
+        with self.assertRaisesRegex(ValueError, "unsupported reasoning_effort"):
+            agent._reasoning_env()
+
     def test_snapshot_command_uses_app_dot_copy(self):
         agent = self.module.ClaudeCodeAuthAgent()
         command = agent._snapshot_command()

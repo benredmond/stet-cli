@@ -303,6 +303,8 @@ Flow-specific recovery actions:
 - `[g] retry grader`: finish retryable artifact-graded task; checks
   `validation/<model_key>/<task_id>/task_decision.json`
 - `[t] revalidate`: rerun tests only when that is the missing signal
+  (`--revalidate-tests-only` can reuse existing artifacts without AI/model
+  registry coverage when no discover/build work is requested)
 
 Recovery rules:
 - If the compare is blocked by invalid or partially valid evidence, explain that

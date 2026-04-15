@@ -152,6 +152,17 @@ stet eval report --change-manifest .stet/rules/stet.change.yaml --json
   `stet suite build`, not a full `stet eval run`.
 - `stet eval smoke` is the canonical quick first-run wrapper.
 - `stet eval run` is the canonical public home for multi-model H2H execution.
+- Fresh `stet eval run` performs one representative smoke pre-pass before
+  canonical work; it does not multiply smoke runs by model or reasoning arm.
+  Successful smoke artifacts are seeded into the canonical root so smoked tasks
+  count toward the full run.
+- To compare reasoning levels, keep the model fixed and use first-class
+  reasoning arms: `stet eval run --dataset <dataset> --model <model> --reasoning-efforts xhigh,high,low --out <out>`.
+  Add `--pinned-task-source` and `--pinned-dataset-key` when reusing prior Stet
+  history. Do not repeat the same model under `--models` for reasoning tests.
+- If multiple experiment arms request the same explicit `model_key`, read the
+  manifest for the effective keys; Stet disambiguates them before writing run
+  and validation artifact paths.
 - `stet eval run --stitch-rerun` is the supported subset-rerun path for an
   existing canonical run root. Do not tell the user to hand-copy retry
   artifacts unless they explicitly need the legacy manual path.

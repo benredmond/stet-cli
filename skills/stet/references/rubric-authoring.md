@@ -60,6 +60,8 @@ then        [s] stop          keep the current rubric draft only
 - Use `unsure` only for genuine middle cases.
 - Prefer scored `0`-`4` rubrics when the user needs discrimination, not just a
   gate.
+- Do not set `value_kind: score` on `pass`/`fail` rubrics. Scored rubrics are
+  inferred from contiguous integer labels such as `"0"` through `"4"`.
 
 ## Templates
 
