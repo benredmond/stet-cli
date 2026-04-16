@@ -68,6 +68,10 @@ Canonical read path:
 5. Read top-level `quality`, `validity`, `evidence_quality`, `lifecycle`, and
    `arms` to interpret the verdict. A good score on degraded evidence is still
    degraded evidence.
+   When evidence is not decision-grade, check
+   `evidence_quality.directional_read`. A usable directional read can guide
+   iteration or prefilter candidates, but should not be treated as a promote or
+   rollback decision without more tasks or clean validity.
 6. Drill into lower-level artifacts only for diagnosis:
    `experiment.json` for compare evidence authority, `release.v1.json` for
    lifecycle authority, `task_decision.json` for task authority,
@@ -134,6 +138,10 @@ Rules for the optimizer:
   `stet --version`, `stet update`, or `stet update --version <tag>`. Pilot
   users need access to `benredmond/stet-dist`, not the private source repo.
   `stet update` refreshes both the binary and local Harbor support agents.
+- Harbor-installed Codex/Claude support agents use `--harness-cli-cache auto`
+  by default. Leave it on for normal batches, use `--harness-cli-cache off`
+  only for cold-start probes, and inspect `runner_runtime.v1.json` plus
+  `harness_cli_cache.json` artifacts before treating setup time as model signal.
 - For the shipped Stet agent skill, use the same private dist repo:
   `npx skills add git@github.com:benredmond/stet-dist.git --skill stet`.
   Release automation syncs `skills/stet` into

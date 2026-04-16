@@ -12,6 +12,7 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trial.paths import EnvironmentPaths
 
 from stet_harbor_agents.compat import ExecInput, HARBOR_HAS_EXEC_INPUT
+from stet_harbor_agents.install_cache import setup_with_cli_cache
 from stet_harbor_agents.patch_capture import AgentPatchCaptureMixin
 
 
@@ -59,7 +60,18 @@ class CodexAuthAgent(AgentPatchCaptureMixin, Codex):
 
     async def setup(self, environment: BaseEnvironment) -> None:
         try:
-            await super().setup(environment)
+            async def install() -> None:
+                await super(CodexAuthAgent, self).setup(environment)
+
+            await setup_with_cli_cache(
+                environment=environment,
+                harness_name="codex",
+                harness_version=str(getattr(self, "_version", "") or "default"),
+                install_method="harbor-installed-agent",
+                binary_name="codex",
+                setup=install,
+                extra={"package": "@openai/codex"},
+            )
         except Exception as exc:
             self._append_bootstrap_marker(
                 self._BOOTSTRAP_STATUS_FAILED,

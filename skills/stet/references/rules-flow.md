@@ -42,6 +42,11 @@ Roles:
 - `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage
 - `eval report`: read the finished rollout decision
 
+To iterate on a high-signal slice from an existing dataset, pass repeatable
+`--task-id <id>` to `eval rules plan` and `eval rules`, or put the stable slice
+in the suite manifest as `selection.task_ids`. Task IDs must match ready task
+directories in `eval.dataset`.
+
 `stet eval rules` is non-destructive by default when a matching rules runtime
 already exists. It reuses completed evidence, auto-resumes candidate-phase
 partial evidence when Stet can prove the replay is safe, and refuses to discard
@@ -215,6 +220,9 @@ repo: .
 selection:
   mode: rev_range
   rev_range: main~5..main
+  task_ids:            # optional targeted rerun slice
+    - flux-pr-1234
+    - flux-pr-5678
 eval:
   dataset: ./dataset
   baseline_model: model:sonnet 4.6
@@ -243,8 +251,8 @@ has them. If a Claude Code compare emits
 `harbor_claude_code_concurrent_setup_cache_skew`, treat setup-only arm failures
 as infrastructure risk first: Harbor `--force-build` still reuses Docker
 layers, so the candidate arm may start installer-heavy containers more
-synchronously than the baseline. Lower `--tb-concurrency` to `2` and use
-`runner.tb_args` memory overrides before rerunning.
+synchronously than the baseline. Lower `--harbor-concurrency` to `2` and use
+`runner.harbor_args` memory overrides before rerunning.
 
 This applies the same runner config to both arms. It is runtime config, not the
 candidate treatment. Use `change.rules.harness` only with a `harness_bundle`

@@ -110,20 +110,20 @@ Minimal harness contract:
 version: 1
 schema: stet.harness/v1
 runner:
-  tb_cmd:
+  harbor_cmd:
     - harbor
 environment:
   dockerfile: .stet/harbor.Dockerfile
 ```
 
 If Harbor needs larger pods, keep the same Dockerfile and add Harbor resource
-overrides under `runner.tb_args`:
+overrides under `runner.harbor_args`:
 
 ```yaml
 runner:
-  tb_cmd:
+  harbor_cmd:
     - harbor
-  tb_args:
+  harbor_args:
     - --override-memory-mb
     - "8192"
     - --override-cpus
@@ -133,7 +133,7 @@ runner:
 Use this for `ENOMEM` / OOMKilled failures during agent setup, including
 Claude Code installation. Prefer `8192` MB first, then `16384` MB if the
 install still OOMs. For compare-backed Claude Code runs, also lower
-`--tb-concurrency` to `2` when Stet reports
+`--harbor-concurrency` to `2` when Stet reports
 `harbor_claude_code_concurrent_setup_cache_skew`; Docker layer cache reuse can
 make the second arm start installer-heavy containers more synchronously than
 the first.
@@ -170,7 +170,7 @@ Debug loop (up to 5 attempts). Ordered by frequency:
 | `ConnectionError` / `fetch failed` | network_flake | Add retry config / package manager setup to the Dockerfile |
 | `ENOENT` from setup hacks on old commits | path_drift | Simplify the Dockerfile; avoid commit-fragile file mutations when possible |
 | vitest/jest per-test timeout | test_config | Prefer durable repo/env setup; patch configs only if CI already does something similar |
-| `ENOMEM` / OOM killed | resource_limit | Increase Harbor memory with `runner.tb_args` / `--tb-arg "--override-memory-mb 8192"`; reduce `--workers` or `--tb-concurrency` if several pods exhaust the node |
+| `ENOMEM` / OOM killed | resource_limit | Increase Harbor memory with `runner.harbor_args` / `--harbor-arg "--override-memory-mb 8192"`; reduce `--workers` or `--harbor-concurrency` if several pods exhaust the node |
 | Docker daemon errors | infra_error | Check `docker ps`, kill zombies, retry |
 | Lockfile version mismatch | lockfile_drift | Pin package manager version in `.stet/harbor.Dockerfile` |
 

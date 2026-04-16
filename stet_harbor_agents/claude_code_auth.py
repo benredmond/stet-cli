@@ -9,6 +9,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
 from stet_harbor_agents.compat import ExecInput
+from stet_harbor_agents.install_cache import setup_with_cli_cache
 from stet_harbor_agents.patch_capture import AgentPatchCaptureMixin
 
 
@@ -169,7 +170,17 @@ fi
         )
 
     async def setup(self, environment: BaseEnvironment) -> None:
-        await super().setup(environment)
+        async def install() -> None:
+            await super(ClaudeCodeAuthAgent, self).setup(environment)
+
+        await setup_with_cli_cache(
+            environment=environment,
+            harness_name="claude-code",
+            harness_version=str(getattr(self, "_version", "") or "default"),
+            install_method="harbor-installed-agent",
+            binary_name="claude",
+            setup=install,
+        )
         await self.snapshot_agent_patch(environment)
 
     async def run(
