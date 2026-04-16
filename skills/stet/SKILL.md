@@ -264,9 +264,12 @@ models, setting up a repo, improving a skill, or checking a release?"
   `stet eval rules resume --change-manifest <stet.change.yaml>` or
   `--rules-root <dir>`. Do not rerun `stet eval rules` to recover partial
   evidence; use `--restart` only when intentionally discarding it.
-- Treat auth, license, Claude `/login`, and Harbor setup-skew failures as
-  infrastructure risk before interpreting candidate quality. See
-  [onboarding](references/onboarding.md) and
+- Treat auth, license, Claude `/login`, and Harbor setup-skew failures such as
+  missing `stet_harbor_agents.*` modules as infrastructure risk before
+  interpreting candidate quality. Run `stet update` from prerelease builds, or
+  use `stet update --prerelease` / `stet update --version <tag>` to refresh the
+  Harbor support files explicitly.
+  See [onboarding](references/onboarding.md) and
   [operator-contract](references/operator-contract.md) for exact recovery.
 - Preserve the release/baseline distinction. Release promotion changes rollout
   state; baseline refresh changes the frozen reference for future compares.

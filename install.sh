@@ -141,6 +141,7 @@ for support_file in \
   stet_harbor_agents/compat.py \
   stet_harbor_agents/claude_code_auth.py \
   stet_harbor_agents/codex_auth.py \
+  stet_harbor_agents/install_cache.py \
   stet_harbor_agents/patch_capture.py \
   stet_harbor_agents/install-claude-code-auth.sh.j2
 do

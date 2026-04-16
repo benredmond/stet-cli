@@ -179,6 +179,14 @@ Install the latest stable release:
 stet update
 ```
 
+When the currently running Stet binary is a prerelease, `stet update` follows
+the prerelease channel. You can also request the latest release candidate
+explicitly:
+
+```sh
+stet update --prerelease
+```
+
 Pin or roll back to an exact version:
 
 ```sh
@@ -213,8 +221,9 @@ export `CLAUDE_CODE_OAUTH_TOKEN`, and rerun Stet. For container-backed Stet
 runs, Stet can also use Claude credential JSON env vars, Anthropic API/auth
 token env vars, or the macOS Keychain item named `Claude Code-credentials`.
 
-If no stable Stet release exists yet, install or update to an explicit prerelease version:
+If no stable Stet release exists yet, install or update to a prerelease:
 
 ```sh
+stet update --prerelease
 stet update --version v0.1.0-rc.3
 ```
