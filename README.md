@@ -2,11 +2,16 @@
 
 Stet is change control for AI coding behavior. It replays real repo work and scores the output so you can safely ship model, config, and skill changes.
 
-**Using an agent?** Point it at this repo and tell it to install Stet.
+Stet is installed in two parts:
+
+- the `stet` CLI, which runs evaluations and manages artifacts
+- the Stet agent skill, which teaches your agent which Stet workflow to use and how to interpret the evidence
+
+For agent-driven use, install both. The CLI gives the agent the tool; the skill gives it the operating contract required to use Stet correctly.
 
 ## What you can ask your agent
 
-Once Stet is installed and the `stet` skill is on your agent, you can drive evaluations in natural language. A few examples:
+Once the CLI and the `stet` skill are installed, you can drive evaluations in natural language. A few examples:
 
 - "Is Opus 4.6 or 4.7 better on my codebase, and on which dimensions?" — runs a head-to-head across replayed tasks and reports per-dimension deltas (correctness, code review, footprint, equivalence).
 - "Make my `CLAUDE.md` better." — proposes edits, then evaluates the new version against the current one on real tasks before recommending the change.
@@ -21,6 +26,7 @@ The agent picks the right Stet surface (quick probe, full eval, baseline rerun) 
 
 - macOS or Linux (x86\_64 or arm64)
 - [GitHub CLI](https://cli.github.com/) authenticated with access to this repo
+- Node.js / `npx` for installing the Stet agent skill
 - Docker ([Desktop](https://www.docker.com/products/docker-desktop/) on macOS, [Engine](https://docs.docker.com/engine/install/) on Linux)
 - Python 3.12+
 
@@ -33,7 +39,7 @@ gh auth status || gh auth login
 gh repo view benredmond/stet-dist --json visibility,url
 ```
 
-### 2. Install Stet
+### 2. Install the Stet CLI
 
 ```sh
 gh api repos/benredmond/stet-dist/contents/install.sh --header "Accept: application/vnd.github.raw" | sh
@@ -59,14 +65,10 @@ stet --version
 
 ### 3. Install the Stet agent skill
 
+This is a first-class part of setup, not an optional add-on. Agents need the skill to route questions to the right Stet surface, preserve decision semantics, read canonical artifacts, and avoid treating directional checks as rollout evidence.
+
 ```sh
 npx skills add git@github.com:benredmond/stet-dist.git --skill stet
-```
-
-To install globally for Codex:
-
-```sh
-npx skills add git@github.com:benredmond/stet-dist.git --skill stet --global --agent codex --yes
 ```
 
 To inspect the skill before installing:
@@ -79,6 +81,12 @@ If your environment has HTTPS git credentials configured for GitHub, the shortha
 
 ```sh
 npx skills add benredmond/stet-dist --skill stet
+```
+
+If your agent supports separate project-level and global skill installs, prefer the install scope that the agent will actually load during Stet work. Verify the skill is visible before running evaluations:
+
+```sh
+npx skills list
 ```
 
 ### 4. Install Docker
