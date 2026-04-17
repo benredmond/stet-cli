@@ -259,6 +259,26 @@ then        [s] stop         keep as directional evidence
 Done in 4 turns. The onboard → smoke → probe pipeline produced the repo's
 first real eval evidence.
 
+When the first real evidence is a small pairwise model compare instead of a
+probe, keep the same baseline-first posture:
+
+```text
+STET :: COMPARE
+
+answer      directional: opus 4.7 leads
+confidence  low
+step        compare -> baseline capture
+baseline    opus 4.6
+candidate   opus 4.7
+sample      3 tasks (below promote-grade threshold)
+driver      opus 4.7 wins every requested quality dimension, with validity ok;
+            the sample is useful for future reference but not for promotion.
+
+next        > [b] baseline   freeze opus 4.7 as the repo's current Opus baseline
+then        [r] rerun        scale to the full task slice for promote-grade evidence
+then        [s] stop         keep only the directional result
+```
+
 ---
 
 ## Trace 4: Active Status With Heartbeat And Lineage

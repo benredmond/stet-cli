@@ -14,6 +14,49 @@ from stet_harbor_agents.install_cache import (
 
 
 class HarnessCLIInstallCacheTests(unittest.TestCase):
+    def _codex_cache_key(self) -> dict[str, str]:
+        return build_cache_key(
+            HarnessCLICacheDescriptor(
+                harness_name="codex",
+                harness_version="0.52.0",
+                install_method="npm-global",
+                os_release_id="debian",
+                os_release_version_id="12",
+                arch="x86_64",
+                runtime_abi="glibc-2.36",
+                extra={"package": "@openai/codex"},
+            )
+        )
+
+    def _write_cache_entry(self, root: Path, *, created_at: float) -> None:
+        key = self._codex_cache_key()
+        cache_dir = root / "v1" / key["cache_key"]
+        (cache_dir / "bin").mkdir(parents=True)
+        (cache_dir / "bin" / "codex").write_text("#!/bin/sh\n", encoding="utf-8")
+        manifest = dict(key)
+        manifest["binary_name"] = "codex"
+        manifest["created_at"] = created_at
+        (cache_dir / "manifest.json").write_text(
+            json.dumps(manifest, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+
+    def _cache_identity_patches(self):
+        return (
+            mock.patch(
+                "stet_harbor_agents.install_cache._os_release_value",
+                side_effect=lambda name: {"ID": "debian", "VERSION_ID": "12"}[name],
+            ),
+            mock.patch(
+                "stet_harbor_agents.install_cache.platform.machine",
+                return_value="x86_64",
+            ),
+            mock.patch(
+                "stet_harbor_agents.install_cache._runtime_abi",
+                return_value="glibc-2.36",
+            ),
+        )
+
     def test_cache_key_is_generic_and_excludes_credentials(self):
         descriptor = HarnessCLICacheDescriptor(
             harness_name="codex",
@@ -109,6 +152,153 @@ class HarnessCLIInstallCacheTests(unittest.TestCase):
                     )
 
             self.assertFalse(any(Path(tmpdir).glob("v1/*")))
+
+    def test_expired_manifest_refreshes_cache(self):
+        class Environment:
+            async def exec(self, command: str, **kwargs):
+                return None
+
+        setup_calls = []
+        metadata_writes = []
+
+        async def setup():
+            setup_calls.append(True)
+
+        async def populate(_environment, cache_dir: Path, _binary_name: str):
+            (cache_dir / "bin").mkdir(parents=True)
+            (cache_dir / "bin" / "codex").write_text("#!/bin/sh\n", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._write_cache_entry(root, created_at=1.0)
+            os_patch, arch_patch, runtime_patch = self._cache_identity_patches()
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "STET_HARNESS_CLI_CACHE_DIR": tmpdir,
+                    "STET_HARNESS_CLI_CACHE_MODE": "on",
+                    "STET_HARNESS_CLI_CACHE_TTL_SEC": "86400",
+                },
+                clear=False,
+            ), os_patch, arch_patch, runtime_patch, mock.patch(
+                "stet_harbor_agents.install_cache._populate_cache", populate
+            ), mock.patch(
+                "stet_harbor_agents.install_cache._write_metadata",
+                side_effect=lambda metadata: metadata_writes.append(dict(metadata)),
+            ):
+                import asyncio
+
+                metadata = asyncio.run(
+                    setup_with_cli_cache(
+                        environment=Environment(),
+                        harness_name="codex",
+                        harness_version="0.52.0",
+                        install_method="npm-global",
+                        binary_name="codex",
+                        setup=setup,
+                        extra={"package": "@openai/codex"},
+                    )
+                )
+
+            self.assertEqual(len(setup_calls), 1)
+            self.assertEqual(metadata["status"], "miss")
+            self.assertEqual(metadata["miss_reason"], "cache_expired")
+            self.assertEqual(metadata["ttl_seconds"], 86400)
+            self.assertEqual(metadata_writes[-1]["miss_reason"], "cache_expired")
+
+    def test_fresh_manifest_uses_cache(self):
+        class Environment:
+            def __init__(self):
+                self.commands = []
+
+            async def exec(self, command: str, **kwargs):
+                self.commands.append(command)
+
+        async def setup():
+            raise AssertionError("fresh cache hit must not run setup")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._write_cache_entry(root, created_at=1.0)
+            environment = Environment()
+            os_patch, arch_patch, runtime_patch = self._cache_identity_patches()
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "STET_HARNESS_CLI_CACHE_DIR": tmpdir,
+                    "STET_HARNESS_CLI_CACHE_MODE": "on",
+                    "STET_HARNESS_CLI_CACHE_TTL_SEC": "999999999999",
+                },
+                clear=False,
+            ), os_patch, arch_patch, runtime_patch:
+                import asyncio
+
+                metadata = asyncio.run(
+                    setup_with_cli_cache(
+                        environment=environment,
+                        harness_name="codex",
+                        harness_version="0.52.0",
+                        install_method="npm-global",
+                        binary_name="codex",
+                        setup=setup,
+                        extra={"package": "@openai/codex"},
+                    )
+                )
+
+            self.assertEqual(metadata["status"], "hit")
+            self.assertEqual(metadata["ttl_seconds"], 999999999999)
+            self.assertEqual(len(environment.commands), 1)
+
+    def test_fractional_age_past_ttl_refreshes_cache(self):
+        class Environment:
+            async def exec(self, command: str, **kwargs):
+                return None
+
+        setup_calls = []
+
+        async def setup():
+            setup_calls.append(True)
+
+        async def populate(_environment, cache_dir: Path, _binary_name: str):
+            (cache_dir / "bin").mkdir(parents=True)
+            (cache_dir / "bin" / "codex").write_text("#!/bin/sh\n", encoding="utf-8")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            self._write_cache_entry(root, created_at=100.0)
+            os_patch, arch_patch, runtime_patch = self._cache_identity_patches()
+            with mock.patch.dict(
+                os.environ,
+                {
+                    "STET_HARNESS_CLI_CACHE_DIR": tmpdir,
+                    "STET_HARNESS_CLI_CACHE_MODE": "on",
+                    "STET_HARNESS_CLI_CACHE_TTL_SEC": "86400",
+                },
+                clear=False,
+            ), os_patch, arch_patch, runtime_patch, mock.patch(
+                "stet_harbor_agents.install_cache._now_seconds",
+                return_value=86500.1,
+            ), mock.patch(
+                "stet_harbor_agents.install_cache._populate_cache", populate
+            ):
+                import asyncio
+
+                metadata = asyncio.run(
+                    setup_with_cli_cache(
+                        environment=Environment(),
+                        harness_name="codex",
+                        harness_version="0.52.0",
+                        install_method="npm-global",
+                        binary_name="codex",
+                        setup=setup,
+                        extra={"package": "@openai/codex"},
+                    )
+                )
+
+            self.assertEqual(len(setup_calls), 1)
+            self.assertEqual(metadata["status"], "miss")
+            self.assertEqual(metadata["miss_reason"], "cache_expired")
+            self.assertGreater(metadata["cache_age_seconds"], 86400)
 
     def test_lock_timeout_does_not_populate_without_lock(self):
         class Environment:

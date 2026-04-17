@@ -37,8 +37,9 @@ For most repos, the quick path is enough:
 #    .stet/stet.harness.yaml under environment.dockerfile.
 
 # 3. If Claude is the selected provider, set up host auth first
-#    Run `claude setup-token`, then export CLAUDE_CODE_OAUTH_TOKEN with the
-#    printed token. Stet fails before launching Claude runs if auth is missing.
+#    Run `claude setup-token`, store the printed token in
+#    ~/.config/stet/claude-oauth-token with 0600 permissions, and do not export
+#    it globally. Stet fails before launching Claude runs if auth is missing.
 
 # 4. Ask the operator which first-run quality posture to use
 #    [r] recommended: discipline bundle + intentionality
@@ -87,9 +88,14 @@ Quality onboarding rules:
   operator for the first-run quality-grader posture: `[r] recommended`
   `discipline` + `intentionality`, `[s] standard` with no repo quality bundle,
   or `[c] custom` after inspecting `stet graders --repo <path> --json`.
-- `stet init --ai-provider claude` requires usable Claude auth. Prefer
-  `CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`; Stet also accepts
-  Claude credential JSON, Anthropic API/auth token env vars, or the macOS
+- `stet init --ai-provider claude` requires usable Claude auth. Prefer running
+  `claude setup-token` and storing the printed token in
+  `~/.config/stet/claude-oauth-token` with `0600` permissions; Stet reads that
+  file and forwards `CLAUDE_CODE_OAUTH_TOKEN` only to Stet-managed Claude runs.
+  Do not put the token in shell profiles, repo `.env` files, or committed
+  config. For one-off automation, use command-scoped env:
+  `CLAUDE_CODE_OAUTH_TOKEN=<token> stet ...`. Stet also accepts Claude
+  credential JSON, Anthropic API/auth token env vars, or the macOS
   `Claude Code-credentials` Keychain item.
 - `stet init --yes` stays low-friction and does not enable quality bundles by
   default. Silent auto-init paths should keep bundle selection empty until an

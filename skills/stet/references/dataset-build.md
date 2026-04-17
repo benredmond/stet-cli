@@ -170,14 +170,46 @@ Debug loop (up to 5 attempts). Ordered by frequency:
 | `ConnectionError` / `fetch failed` | network_flake | Add retry config / package manager setup to the Dockerfile |
 | `ENOENT` from setup hacks on old commits | path_drift | Simplify the Dockerfile; avoid commit-fragile file mutations when possible |
 | vitest/jest per-test timeout | test_config | Prefer durable repo/env setup; patch configs only if CI already does something similar |
-| `ENOMEM` / OOM killed | resource_limit | Increase Harbor memory with `runner.harbor_args` / `--harbor-arg "--override-memory-mb 8192"`; reduce `--workers` or `--harbor-concurrency` if several pods exhaust the node |
-| Docker daemon errors | infra_error | Check `docker ps`, kill zombies, retry |
+| `ENOMEM` / OOM killed / exit 137 | resource_limit | Increase Harbor pod memory if possible; if Docker Desktop cannot raise limits, reduce `--workers`, `--harbor-concurrency`, or `--command-workers`; inspect `docker events` to distinguish OOM from external SIGKILL |
+| Docker daemon/network errors | infra_error | Check daemon health, stale containers, and stale networks; if no run is active, prune stopped containers and unused networks, then retry with lower effective concurrency |
 | Lockfile version mismatch | lockfile_drift | Pin package manager version in `.stet/harbor.Dockerfile` |
 
 After >= 80% gold pass, verify test_cmd relevance: pick a task with test
 patch, confirm test_cmd runs those files.
 
 **CHECKPOINT: Report iteration results. Proceed to scale on approval.**
+
+## Docker Desktop Capacity Budget
+
+Before scaling Docker-heavy build batches, check for stale state:
+
+```bash
+docker ps
+docker system df
+docker network ls
+```
+
+If no Stet/Harbor run is active and Docker has stale stopped containers or
+unused per-run networks, clean only unused resources:
+
+```bash
+docker container prune -f
+docker network prune -f
+```
+
+Do not prune images/build cache during normal performance work; warm layers can
+make repeated Harbor runs faster.
+
+When Docker Desktop cannot allocate more memory, tune concurrency instead of
+raising resource limits. Start with `--workers 2` for dataset builds. For eval
+runs, budget effective concurrency explicitly:
+
+- harness phase: `model-workers * harbor-concurrency`
+- validation phase: `workers * command-workers`
+
+Keep validation pressure around 5 or lower when Docker networking is strained.
+For Claude Code compare/rules runs, prefer `--harbor-concurrency 2`; for Codex
+runs, raise one axis at a time and watch `docker stats` / `docker events`.
 
 ## Phase 3: Scale + Audit
 

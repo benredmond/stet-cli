@@ -8,6 +8,7 @@ import platform
 import re
 import shlex
 import shutil
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Awaitable, Callable
@@ -15,7 +16,9 @@ from typing import Awaitable, Callable
 
 CACHE_DIR_ENV = "STET_HARNESS_CLI_CACHE_DIR"
 CACHE_MODE_ENV = "STET_HARNESS_CLI_CACHE_MODE"
+CACHE_TTL_ENV = "STET_HARNESS_CLI_CACHE_TTL_SEC"
 CACHE_ARTIFACT_PATH = Path("/logs/agent/harness_cli_cache.json")
+DEFAULT_CACHE_TTL_SEC = 24 * 60 * 60
 SECRET_KEY_RE = re.compile(
     r"(token|secret|password|credential|api[_-]?key|oauth)",
     re.IGNORECASE,
@@ -83,7 +86,7 @@ async def setup_with_cli_cache(
     binary_name: str,
     setup: Callable[[], Awaitable[None]],
     extra: dict[str, str] | None = None,
-) -> dict[str, str | bool]:
+) -> dict[str, str | bool | int | float]:
     mode = (os.environ.get(CACHE_MODE_ENV) or "auto").strip().lower()
     root_raw = (os.environ.get(CACHE_DIR_ENV) or "").strip()
     if mode in ("", "off") or not root_raw:
@@ -100,6 +103,7 @@ async def setup_with_cli_cache(
         return metadata
     if mode not in ("auto", "on"):
         raise ValueError("STET_HARNESS_CLI_CACHE_MODE must be auto, on, or off")
+    ttl_seconds = _cache_ttl_seconds()
 
     descriptor = HarnessCLICacheDescriptor(
         harness_name=harness_name,
@@ -117,19 +121,45 @@ async def setup_with_cli_cache(
     manifest_path = cache_dir / "manifest.json"
     lock_dir = cache_dir.with_suffix(".lock")
 
+    miss_reason: str | None = None
+    cache_age_seconds: float | None = None
     if manifest_path.exists():
-        await _activate_cache(environment, cache_dir, binary_name)
-        metadata = _metadata("hit", mode, harness_name, harness_version, key)
-        _write_metadata(metadata)
-        return metadata
+        cache_age_seconds = _cache_age_seconds(manifest_path)
+        if _cache_fresh(cache_age_seconds, ttl_seconds):
+            await _activate_cache(environment, cache_dir, binary_name)
+            metadata = _metadata(
+                "hit",
+                mode,
+                harness_name,
+                harness_version,
+                key,
+                ttl_seconds=ttl_seconds,
+                cache_age_seconds=cache_age_seconds,
+            )
+            _write_metadata(metadata)
+            return metadata
+        miss_reason = "cache_expired"
 
     await _acquire_lock(lock_dir)
     try:
+        miss_reason = None
+        cache_age_seconds = None
         if manifest_path.exists():
-            await _activate_cache(environment, cache_dir, binary_name)
-            metadata = _metadata("hit", mode, harness_name, harness_version, key)
-            _write_metadata(metadata)
-            return metadata
+            cache_age_seconds = _cache_age_seconds(manifest_path)
+            if _cache_fresh(cache_age_seconds, ttl_seconds):
+                await _activate_cache(environment, cache_dir, binary_name)
+                metadata = _metadata(
+                    "hit",
+                    mode,
+                    harness_name,
+                    harness_version,
+                    key,
+                    ttl_seconds=ttl_seconds,
+                    cache_age_seconds=cache_age_seconds,
+                )
+                _write_metadata(metadata)
+                return metadata
+            miss_reason = "cache_expired"
 
         await setup()
         stage_dir = root / "staging" / f"{key['cache_key']}.{os.getpid()}"
@@ -143,6 +173,7 @@ async def setup_with_cli_cache(
             raise
         manifest = dict(key)
         manifest["binary_name"] = binary_name
+        manifest["created_at"] = _now_seconds()
         (stage_dir / "manifest.json").write_text(
             json.dumps(manifest, sort_keys=True) + "\n",
             encoding="utf-8",
@@ -150,7 +181,16 @@ async def setup_with_cli_cache(
         if cache_dir.exists():
             shutil.rmtree(cache_dir)
         stage_dir.rename(cache_dir)
-        metadata = _metadata("miss", mode, harness_name, harness_version, key)
+        metadata = _metadata(
+            "miss",
+            mode,
+            harness_name,
+            harness_version,
+            key,
+            miss_reason=miss_reason,
+            ttl_seconds=ttl_seconds,
+            cache_age_seconds=cache_age_seconds,
+        )
         _write_metadata(metadata)
         return metadata
     finally:
@@ -210,8 +250,12 @@ def _metadata(
     harness_name: str,
     harness_version: str,
     key: dict[str, str],
-) -> dict[str, str | bool]:
-    return {
+    *,
+    miss_reason: str | None = None,
+    ttl_seconds: int | None = None,
+    cache_age_seconds: float | None = None,
+) -> dict[str, str | bool | int | float]:
+    metadata = {
         "mode": mode,
         "enabled": True,
         "status": status,
@@ -219,9 +263,16 @@ def _metadata(
         "harness_version": harness_version,
         "cache_key": key["cache_key"],
     }
+    if miss_reason:
+        metadata["miss_reason"] = miss_reason
+    if ttl_seconds is not None:
+        metadata["ttl_seconds"] = ttl_seconds
+    if cache_age_seconds is not None:
+        metadata["cache_age_seconds"] = cache_age_seconds
+    return metadata
 
 
-def _write_metadata(metadata: dict[str, str | bool]) -> None:
+def _write_metadata(metadata: dict[str, str | bool | int | float]) -> None:
     try:
         CACHE_ARTIFACT_PATH.parent.mkdir(parents=True, exist_ok=True)
         CACHE_ARTIFACT_PATH.write_text(
@@ -247,6 +298,47 @@ def _runtime_abi() -> str:
     libc_name, libc_version = platform.libc_ver()
     libc = "-".join(part for part in (libc_name, libc_version) if part)
     return libc or platform.system().lower()
+
+
+def _cache_ttl_seconds() -> int:
+    raw = (os.environ.get(CACHE_TTL_ENV) or "").strip()
+    if raw == "":
+        return DEFAULT_CACHE_TTL_SEC
+    try:
+        ttl = int(raw)
+    except ValueError as exc:
+        raise ValueError(f"{CACHE_TTL_ENV} must be a non-negative integer") from exc
+    if ttl < 0:
+        raise ValueError(f"{CACHE_TTL_ENV} must be a non-negative integer")
+    return ttl
+
+
+def _cache_fresh(cache_age_seconds: float, ttl_seconds: int) -> bool:
+    return ttl_seconds == 0 or cache_age_seconds <= ttl_seconds
+
+
+def _cache_age_seconds(manifest_path: Path) -> float:
+    created_at = _cache_created_at(manifest_path)
+    age = _now_seconds() - created_at
+    return max(0.0, age)
+
+
+def _cache_created_at(manifest_path: Path) -> float:
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        created_at = manifest.get("created_at")
+        if isinstance(created_at, (int, float)) and created_at >= 0:
+            return float(created_at)
+    except (OSError, json.JSONDecodeError, TypeError):
+        pass
+    try:
+        return manifest_path.stat().st_mtime
+    except OSError:
+        return _now_seconds()
+
+
+def _now_seconds() -> float:
+    return time.time()
 
 
 def _looks_secret_key(name: str) -> bool:

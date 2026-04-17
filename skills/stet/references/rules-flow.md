@@ -39,7 +39,7 @@ Roles:
 - `eval rules plan`: preflight tasks, arms, graders, frozen-baseline reuse, cost confidence, missing pricing/cost data, and cheaper alternatives without writing runtime artifacts or launching evaluator work
 - `eval rules`: launch the bounded rules-backed run
 - `eval status`: explain the current phase or health
-- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage
+- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage. Pass `--report-mode separate_axes|strict_publishable_pass` to pin the reporting mode when the baseline and candidate arms were produced by Stet binaries whose default drifted; baseline mode is used automatically otherwise.
 - `eval report`: read the finished rollout decision
 
 To iterate on a high-signal slice from an existing dataset, pass repeatable
@@ -77,6 +77,39 @@ the `skill_workbench` pack instead (see below).
 Missing expected quality graders produce an `inspect` verdict with a concrete
 `regrade-graders` repair command.
 
+## Skill Comparison Modes
+
+Classify the skill question before choosing a command:
+
+| Question | Baseline | Surface | Graders |
+|---|---|---|---|
+| Does adding this skill help? | no usable skill guidance | manifest-backed `stet eval rules`, or frozen-baseline compare | `equivalence`, `footprint_risk`, and custom behavior rubrics; use `quality_only` rubrics when repo tests are not signal |
+| Is this skill revision better? | committed prior skill | `stet eval rules skill` | wrapper defaults, or explicit `--grader` overrides |
+| Is the SKILL.md itself well written? | prior or candidate skill text | `skill_workbench` | `skill_workbench` dimensions |
+
+For new-skill A/B tests, do not commit a vague v0 skill just to create an
+anchor. Prefer a true skill-absent baseline. If `skill_diff` needs exactly one
+baseline match, a committed placeholder is acceptable only when it has an
+impossible trigger and no actionable guidance; report it as "effectively no
+skill", not as literal absence.
+
+For manifest-backed `stet eval rules`, put custom graders in
+`change.rules.graders`; `stet eval rules` does not accept `--grader` launch
+flags. For `stet eval rules skill`, repeated `--grader` flags are wrapper
+inputs and replace the default grader set.
+
+Use `skill_workbench` when the decision is about skill text quality. For the
+first "with skill vs without skill" sanity check, behavior graders should carry
+the decision because they grade the agent's output on replay tasks.
+
+Choose test posture before launch. Use `tests_gated` only when repo test
+pass/fail is part of the skill decision. If the skill is intended to improve
+agent process, routing, or transcript behavior and repo tests add no signal,
+use `quality_only` in `change.rules.mode` and make custom behavior rubrics
+`mode: quality_only`. Do not tell the operator tests will be skipped unless the
+chosen flow actually avoids fresh Harbor validation; validation-backed runs may
+still materialize task details even when tests are non-decisive.
+
 ## Shared Skill Wrapper
 
 For repo-managed shared skill iteration, prefer the wrapper instead of hand-writing
@@ -110,6 +143,8 @@ stet eval report --change-manifest .stet/skill-loops/planner/stet.change.yaml --
 Use the `--plan` form before launch when the operator needs a budget decision;
 it does not write the wrapper bundle, build the replay dataset, or launch
 `eval rules`.
+If `stet eval rules plan` is blocked by commercial entitlement, treat that as an
+access/preflight limitation rather than evidence that the manifest is invalid.
 
 The wrapper writes:
 - `.stet/skill-loops/<name>/stet.change.yaml` with a single `skill_diff` treatment
@@ -136,6 +171,23 @@ Default graders are the normal coding-quality trio plus the bundled
 - `skill_command_exactness`
 - `skill_tool_selection`
 - `skill_regression_risk`
+
+Preflight before launching a skill compare:
+- Verify whether the baseline ref contains the skill file; if not, this is a
+  new-skill A/B, not a normal revision loop.
+- Decide whether repo tests are decision signal. If not, avoid `tests_gated`
+  custom rubrics and prefer `quality_only`/existing-details quality-only
+  evidence before launching fresh Harbor work.
+- Check `.agents/skills` and `.claude/skills` precedence, and watch for symlinked
+  skills roots that point outside the repo.
+- Inspect `--plan` output for arms, task count, grader IDs, and whether the
+  wrapper will build a fresh replay dataset. If the repo already has a reusable
+  dataset but lacks `.stet/stet.harness.yaml`, use a hand-authored
+  manifest-backed `stet eval rules` flow against that dataset instead of forcing
+  the wrapper.
+- After a `START stet-eval-rules` line or CLI timeout, do not relaunch blindly.
+  Use `stet eval status --change-manifest <stet.change.yaml> --json` or inspect
+  the printed log/output root.
 
 After the report materializes, read `evidence.skill_loop_path` and the linked
 `skill_loop.v1.json`. It persists the loop goal, task source, skill path, cycle,

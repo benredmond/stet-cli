@@ -111,7 +111,11 @@ Rules for the optimizer:
   This saves model/evaluator tokens and constrains the task slice, provenance,
   and Search Space for the next iteration. Skip only when the baseline evidence
   is stale, invalid, unrepresentative, or the operator needs fresh release-gate
-  evidence.
+  evidence. For first-in-repo model, reasoning, or harness-setting results,
+  make baseline freeze an explicit next action whenever validity is ok and the
+  run is likely to anchor future comparisons, even if the evidence is only
+  directional; label the frozen baseline's sample size and confidence, and do
+  not equate baseline refresh with promote-grade evidence.
 - When pass rates tie, use quality dimensions above the gate: equivalence,
   code review, footprint/risk, cost, and custom graders.
 - To discover common coding-outcome grader IDs, run
@@ -142,6 +146,8 @@ Rules for the optimizer:
   by default. Leave it on for normal batches, use `--harness-cli-cache off`
   only for cold-start probes, and inspect `runner_runtime.v1.json` plus
   `harness_cli_cache.json` artifacts before treating setup time as model signal.
+  Cache entries refresh after 24h by default; use
+  `STET_HARNESS_CLI_CACHE_TTL_SEC=0` only for intentional no-TTL reuse.
 - For the shipped Stet agent skill, use the same private dist repo:
   `npx skills add git@github.com:benredmond/stet-dist.git --skill stet`.
   Release automation syncs `skills/stet` into
@@ -175,7 +181,8 @@ models, setting up a repo, improving a skill, or checking a release?"
 
 | What the user is asking | Start here | Read next |
 |---|---|---|
-| "Is this AGENTS.md / CLAUDE.md / shared skill / policy helping?" | `stet manifest resolve`, `stet eval rules plan`, then `stet eval rules` | [rules-flow](references/rules-flow.md) |
+| "Is this AGENTS.md / CLAUDE.md / policy helping?" | `stet manifest resolve`, `stet eval rules plan`, then `stet eval rules` | [rules-flow](references/rules-flow.md) |
+| "Does adding this new skill help?" / "with skill vs without skill" | New-skill A/B: keep baseline skill-absent or effectively empty, use behavior graders, then `stet eval rules` or a frozen-baseline compare | [rules-flow](references/rules-flow.md) |
 | "I want the fastest local directional read on a file change" | `stet probe --file` or `stet eval config-diff` | [quick-probe](references/quick-probe.md) |
 | "Try this candidate on my repo" | `stet probe` | [quick-probe](references/quick-probe.md) |
 | "Is this change safe to ship?" | `stet manifest resolve`, `stet eval rules plan`, then `stet eval rules` for shared behavior changes; otherwise `stet probe` | [rules-flow](references/rules-flow.md), [quick-probe](references/quick-probe.md) |
@@ -186,7 +193,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | "Resume an incomplete rules compare" | `stet eval rules resume` | [rules-flow](references/rules-flow.md) |
 | "Set up evals for this repo" | author `.stet/harbor.Dockerfile` + `.stet/stet.harness.yaml`, then `stet init` and `stet suite discover` | [onboarding](references/onboarding.md) |
 | "Build a large dataset (50+ tasks)" | `stet suite discover` + `stet suite build` | [dataset-build](references/dataset-build.md) |
-| "Is my shared skill better?" | `stet eval rules skill --plan`, then `stet eval rules skill` | [rules-flow](references/rules-flow.md), [iterative-improvement](references/iterative-improvement.md) |
+| "Is my shared skill revision better?" | `stet eval rules skill --plan`, then `stet eval rules skill` against the committed prior skill | [rules-flow](references/rules-flow.md), [iterative-improvement](references/iterative-improvement.md) |
 | "Is my research / plan better?" | choose or write custom rubrics | [rubric-authoring](references/rubric-authoring.md) |
 | "Help me write a custom grader" | rubric design + calibrate | [rubric-authoring](references/rubric-authoring.md) |
 | "Keep improving until it passes" | scored improve-eval loop | [iterative-improvement](references/iterative-improvement.md) |
@@ -205,6 +212,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | Quick smoke | First multi-model read with no usable Stet history | `stet eval smoke` |
 | Pairwise compare | Baseline vs candidate | `stet eval compare` -> `stet eval report` |
 | Baseline-first | Freeze reusable evidence, then compare candidates without rerunning the baseline arm | `stet baseline freeze` -> `stet eval compare --baseline` |
+| New skill A/B | Check whether adding a skill changes agent behavior | baseline absent/effectively empty skill -> choose test posture -> custom behavior graders -> `stet eval rules` |
 | Rules skill loop | Replay-backed shared skill improvement on the canonical rules surface | `stet eval rules skill --plan` -> `stet eval rules skill` -> `stet eval status` -> `stet eval report` |
 | Repo onboarding | New repo, no dataset yet | author harness Dockerfile -> `stet init` -> `stet suite discover` -> `stet suite build` |
 | Dataset eval | Reusable benchmark | `stet suite build` -> `stet eval run` -> `stet eval report` |
@@ -237,6 +245,15 @@ models, setting up a repo, improving a skill, or checking a release?"
 - For repo-managed skills under `.agents/skills` or `.claude/skills`, treat the
   changed skill as the target and the full managed skills tree as the frozen
   runtime envelope. Precedence is `.agents/skills` over `.claude/skills`.
+- Split skill comparisons by baseline semantics. For a new skill, answer
+  "with skill vs without skill": the baseline should have no usable skill
+  guidance, and `skill_workbench` is secondary because it grades the skill text,
+  not the agent's task output. For a skill revision, answer "candidate skill vs
+  committed prior skill" and prefer `stet eval rules skill`.
+- Decide test posture before launching a skill A/B. If repo tests are not part
+  of the question, do not use `tests_gated` rubrics as the primary signal; use
+  `quality_only` behavior rubrics or an existing-details quality-only path, and
+  say explicitly whether Harbor repo tests will run.
 - For model, reasoning-level, or harness-setting selection, prefer exact
   comparable roots from `stet context --repo <repo> --json`, then pinned reuse
   of prior task selection, then a fresh dataset-backed run. Treat `stet eval
@@ -266,9 +283,11 @@ models, setting up a repo, improving a skill, or checking a release?"
   evidence; use `--restart` only when intentionally discarding it.
 - Treat auth, license, Claude `/login`, and Harbor setup-skew failures such as
   missing `stet_harbor_agents.*` modules as infrastructure risk before
-  interpreting candidate quality. Run `stet update` from prerelease builds, or
-  use `stet update --prerelease` / `stet update --version <tag>` to refresh the
-  Harbor support files explicitly.
+  interpreting candidate quality. For Claude Code auth, prefer the Stet-private
+  `~/.config/stet/claude-oauth-token` file with `0600` permissions; avoid
+  global shell exports and repo-local env files. Run `stet update` from
+  prerelease builds, or use `stet update --prerelease` /
+  `stet update --version <tag>` to refresh the Harbor support files explicitly.
   See [onboarding](references/onboarding.md) and
   [operator-contract](references/operator-contract.md) for exact recovery.
 - Preserve the release/baseline distinction. Release promotion changes rollout
@@ -314,6 +333,12 @@ Decision shortcuts:
 - AGENTS.md/CLAUDE.md treatments are disk overlays, not prompt injection. Harbor
   stages them outside `/app`, installs through existing symlink targets, and
   commits the overlay baseline so captured patches exclude treatment churn.
+- Docker capacity is shared across Harbor task concurrency, model workers,
+  validation workers, and command workers. When Docker Desktop cannot allocate
+  more memory, keep effective concurrency explicit: harness pressure is roughly
+  `model-workers * harbor-concurrency`; validation pressure is roughly
+  `workers * command-workers`. Clean stale containers/networks before blaming
+  model quality or repo setup.
 
 ## Read As Needed
 

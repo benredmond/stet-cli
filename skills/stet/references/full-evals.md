@@ -99,6 +99,16 @@ stet eval status --out .stet/eval-output --json
 stet eval report --out .stet/eval-output --json
 ```
 
+For Docker Desktop hosts, do not raise all concurrency knobs together. Use:
+
+```bash
+stet eval run ... --model-workers 1 --harbor-concurrency 4 --workers 5 --command-workers 1
+```
+
+for a Codex-heavy first full run after cleanup. For Claude Code, prefer
+`--harbor-concurrency 2`, especially for compare/rules flows. If increasing
+throughput, change one axis at a time and monitor Docker.
+
 Machine-readable default:
 - Use `stet eval status --json` for health, liveness, and smoke/full lineage.
 - Use persisted `eval_report.v1.json` when present, or

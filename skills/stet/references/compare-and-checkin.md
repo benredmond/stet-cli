@@ -112,6 +112,29 @@ then        [i] inspect              review remaining quality misses before anot
 then        [s] stop                 keep the compare verdict without updating the baseline
 ```
 
+When this is the first completed model, reasoning, or harness-setting compare
+for a repo, valid directional evidence can still be worth freezing. If one arm
+clearly leads but the sample is too small for promotion, recommend baseline
+capture as the default next step and keep the confidence label explicit:
+
+```text
+STET :: COMPARE
+
+answer      directional winner
+confidence  low
+step        compare -> baseline capture
+baseline    opus 4.6
+candidate   opus 4.7
+sample      3 tasks (directional only)
+delta       tests +0pp  equiv +0.69  review +0.69  cost lower
+driver      candidate leads across every requested quality dimension, but the
+            sample is below the decision-grade threshold.
+
+next        > [b] baseline   freeze 4.7 as the repo's current Opus baseline
+then        [r] rerun        scale to the full slice for promote-grade evidence
+then        [s] stop         keep the directional verdict without baseline state
+```
+
 When the failure taxonomy shows `no_patch` or `infra` counts, surface them in the
 `failures` and `driver` rows. These indicate infrastructure or setup failures, not
 genuine model quality differences — the operator needs to know whether the delta is
@@ -204,6 +227,10 @@ Baseline reference rules:
   updating the "current" baseline for future work, recommend
   `stet baseline freeze --from <winning-candidate-root> --name <baseline-id>`
   before suggesting another improvement loop.
+- If this is the first valid model or harness-setting result for a repo,
+  recommend freezing the leading arm as a directional baseline before asking the
+  operator to spend on another comparison. Make clear that the baseline is a
+  reusable reference, not a release promotion.
 - For dataset-backed compare, task selectors are optional. When `--task-id` /
   `--task-pr` are omitted, compare runs all realized tasks from the dataset.
 - Do not recommend `--baseline-instruction-file` /

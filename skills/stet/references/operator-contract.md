@@ -189,7 +189,7 @@ recovery.
 | Command not found / CLI error | Check `stet` installed and on PATH. Report. |
 | Auth failure / 401 / 403 | Report credential issue. Do not retry. |
 | Timeout | `stet eval status --out <root>`. Offer `[w]` wait or `[r]` rerun. |
-| Docker / container failure | Check `docker ps`. Offer `[r]` rerun with fewer workers. |
+| Docker / container failure | Check `docker ps`, `docker system df`, and `docker network ls`. If no run is active, offer cleanup: `docker container prune -f` and `docker network prune -f`. Then rerun with lower effective concurrency. |
 | Partial / incomplete compare | Read `compare_state.next_action`. Offer recovery. |
 | Invalid or degraded evidence | Read `validity` / `evidence_quality`. Lower confidence, explain the degradation, and fail closed to inspect when needed. |
 | Empty / zero-score grading | Check grader cmd. Offer `[r]` rerun or `[i]` inspect. |

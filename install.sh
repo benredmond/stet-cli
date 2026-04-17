@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-DEFAULT_REPO="${STET_DIST_REPO:-benredmond/stet-dist}"
+DEFAULT_REPO="${STET_DIST_REPO:-benredmond/stet-cli}"
 DEFAULT_BIN_DIR="${STET_INSTALL_DIR:-$HOME/.local/bin}"
 
 repo="$DEFAULT_REPO"
@@ -17,7 +17,7 @@ usage() {
   cat <<'EOF'
 usage: install.sh [--version <tag>] [--repo <owner/repo>] [--bin-dir <path>]
 
-Install the latest stable Stet binary release from the private dist repo.
+Install the latest stable Stet binary release.
 Use --version to pin or roll back to an exact release tag.
 EOF
 }
