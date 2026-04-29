@@ -3,7 +3,9 @@ import asyncio
 import base64
 import json
 import os
+import subprocess
 import sys
+import tempfile
 import types
 import unittest
 from dataclasses import dataclass
@@ -231,7 +233,231 @@ class ClaudeCodeAuthAgentTests(unittest.TestCase):
         self.assertIn("git -C /app diff --binary --no-color HEAD --", command)
         self.assertIn("git -C /app ls-files --others --exclude-standard", command)
         self.assertIn("git -C /app diff --no-index --binary --no-color -- /dev/null", command)
-        self.assertIn("diff -ruN -x .git", command)
+        self.assertIn('git --git-dir="$ignore_repo/.git" --work-tree=/app ls-files --others --exclude-standard', command)
+        self.assertIn('diff -ruN "$old_path" "$new_path"', command)
+
+    def test_patch_filter_strips_env_artifacts_and_keeps_source(self):
+        patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+        patch = """diff --git a/src/index.ts b/src/index.ts
+index 1111111..2222222 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1 +1 @@
+-old
++new
+diff --git a/node_modules/pkg/index.js b/node_modules/pkg/index.js
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/node_modules/pkg/index.js
+@@ -0,0 +1 @@
++generated
+diff --git a/package-lock.json b/package-lock.json
+index 4444444..5555555 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1 +1 @@
+-{}
++{"lockfileVersion": 3}
+"""
+
+        filtered = patch_capture.filter_patch_text(patch)
+
+        self.assertIn("diff --git a/src/index.ts b/src/index.ts", filtered)
+        self.assertNotIn("node_modules", filtered)
+        self.assertIn("package-lock.json", filtered)
+
+    def test_patch_filter_strips_lockfile_without_source_change(self):
+        patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+        patch = """diff --git a/package-lock.json b/package-lock.json
+index 4444444..5555555 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1 +1 @@
+-{}
++{"lockfileVersion": 3}
+"""
+
+        filtered = patch_capture.filter_patch_text(patch)
+
+        self.assertEqual("", filtered)
+
+    def test_patch_filter_strips_root_dot_paths(self):
+        patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+        patch = """diff --git a/.stet/gold.patch b/.stet/gold.patch
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/.stet/gold.patch
+@@ -0,0 +1 @@
++generated
+"""
+
+        filtered = patch_capture.filter_patch_text(patch)
+
+        self.assertEqual("", filtered)
+
+    def test_patch_filter_strips_root_guidance_files(self):
+        patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+        patch = """diff --git a/src/index.ts b/src/index.ts
+index 1111111..2222222 100644
+--- a/src/index.ts
++++ b/src/index.ts
+@@ -1 +1 @@
+-old
++new
+diff --git a/AGENTS.md b/AGENTS.md
+index 3333333..4444444 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -1 +1 @@
+-old guidance
++rewritten guidance
+diff --git a/CLAUDE.md b/CLAUDE.md
+index 5555555..6666666 100644
+--- a/CLAUDE.md
++++ b/CLAUDE.md
+@@ -1 +1 @@
+-old claude
++rewritten claude
+"""
+
+        filtered = patch_capture.filter_patch_text(patch)
+
+        self.assertIn("diff --git a/src/index.ts b/src/index.ts", filtered)
+        self.assertNotIn("AGENTS.md", filtered)
+        self.assertNotIn("CLAUDE.md", filtered)
+
+    def test_snapshot_fallback_honors_gitignore_before_diffing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            snapshot_dir = root / "snapshot"
+            snapshot_app = snapshot_dir / "app"
+            logs = root / "logs" / "agent"
+            (app / "src").mkdir(parents=True)
+            (app / "node_modules" / "pkg").mkdir(parents=True)
+            (snapshot_app / "src").mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (app / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+            (snapshot_app / ".gitignore").write_text("node_modules/\n", encoding="utf-8")
+            (snapshot_app / "src" / "index.ts").write_text("old\n", encoding="utf-8")
+            (app / "src" / "index.ts").write_text("new\n", encoding="utf-8")
+            (app / "node_modules" / "pkg" / "index.js").write_text("generated\n", encoding="utf-8")
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            agent._PATCH_SNAPSHOT_DIR = snapshot_dir
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertIn("src/index.ts", patch)
+            self.assertNotIn("node_modules", patch)
+            self.assertIn("diff -ruN", patch)
+
+    def test_snapshot_fallback_honors_custom_gitignore_for_new_files(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            snapshot_dir = root / "snapshot"
+            snapshot_app = snapshot_dir / "app"
+            logs = root / "logs" / "agent"
+            (app / "scratch").mkdir(parents=True)
+            (snapshot_app / "src").mkdir(parents=True)
+            (app / "src").mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (app / ".gitignore").write_text("scratch/\n", encoding="utf-8")
+            (snapshot_app / ".gitignore").write_text("scratch/\n", encoding="utf-8")
+            (app / "scratch" / "generated.txt").write_text("generated\n", encoding="utf-8")
+            (snapshot_app / "src" / "index.ts").write_text("old\n", encoding="utf-8")
+            (app / "src" / "index.ts").write_text("new\n", encoding="utf-8")
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            agent._PATCH_SNAPSHOT_DIR = snapshot_dir
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertIn("src/index.ts", patch)
+            self.assertNotIn("scratch/generated.txt", patch)
+
+    def test_snapshot_fallback_keeps_preexisting_ignored_file_changes(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            snapshot_dir = root / "snapshot"
+            snapshot_app = snapshot_dir / "app"
+            logs = root / "logs" / "agent"
+            (app / "generated").mkdir(parents=True)
+            (snapshot_app / "generated").mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (app / ".gitignore").write_text("generated/\n", encoding="utf-8")
+            (snapshot_app / ".gitignore").write_text("generated/\n", encoding="utf-8")
+            (snapshot_app / "generated" / "tracked.txt").write_text("old\n", encoding="utf-8")
+            (app / "generated" / "tracked.txt").write_text("new\n", encoding="utf-8")
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            agent._PATCH_SNAPSHOT_DIR = snapshot_dir
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertIn("generated/tracked.txt", patch)
+            self.assertIn("-old", patch)
+            self.assertIn("+new", patch)
+
+    def test_snapshot_fallback_strips_lockfile_only_patch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            snapshot_dir = root / "snapshot"
+            snapshot_app = snapshot_dir / "app"
+            logs = root / "logs" / "agent"
+            app.mkdir(parents=True)
+            snapshot_app.mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (snapshot_app / "package-lock.json").write_text('{"lockfileVersion": 2}\n', encoding="utf-8")
+            (app / "package-lock.json").write_text('{"lockfileVersion": 3}\n', encoding="utf-8")
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            agent._PATCH_SNAPSHOT_DIR = snapshot_dir
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertEqual("", patch)
 
     def test_setup_snapshots_app_tree_before_run(self):
         agent = self.module.ClaudeCodeAuthAgent()

@@ -162,7 +162,7 @@ in `.zshrc`, `.zprofile`, repo `.env` files, or committed config. For one-off
 automation where a file is not appropriate, scope the variable to the command:
 `CLAUDE_CODE_OAUTH_TOKEN=<token> stet ...`.
 
-Stet also accepts `CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, or the macOS Keychain item `Claude Code-credentials`. If Claude is selected and none are present, Stet fails before launching the run.
+Stet also accepts `CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN`. Stet does not read Claude credentials from the macOS Keychain by default. If Claude is selected and none are present, Stet fails before launching the run.
 
 ## Update and roll back
 

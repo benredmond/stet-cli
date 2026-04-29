@@ -128,6 +128,18 @@ For partial reruns on an existing root, keep `--out` pointed at the canonical
 root and add `--task-id ... --stitch-rerun`. This preserves the original slice,
 refreshes only the selected task artifacts, and regenerates one merged summary.
 
+When comparing a model whose outputs will be judged by LLM-backed graders,
+persist the evaluator in the suite manifest so reruns keep the same provenance:
+
+```yaml
+eval:
+  grader_ai_cmd: CODEX_MODEL=gpt-5.4 codex exec --skip-git-repo-check --sandbox read-only -
+  grader_ai_model_id: gpt-5.4
+```
+
+Use `--grader-ai-cmd` and `--grader-ai-model-id` only for one-off overrides.
+`grader_ai_model_id` is required when `grader_ai_cmd` is configured.
+
 Before `stet init`, the agent should inspect repo evidence and decide the test
 commands itself. Treat `stet init` as config persistence, not as the authority
 that decides the repo's test setup.

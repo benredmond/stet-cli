@@ -35,12 +35,19 @@ stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 Roles:
-- `manifest resolve`: inspect normalized inputs before launch
-- `eval rules plan`: preflight tasks, arms, graders, frozen-baseline reuse, cost confidence, missing pricing/cost data, and cheaper alternatives without writing runtime artifacts or launching evaluator work
+- `manifest resolve`: inspect normalized inputs before launch. Prints the canonical resolved change manifest as YAML (or JSON with `--json`); injected defaults (e.g. `context.baseline.source`, `context.candidate.source`, `policy.version`, `treatments[*].path`) are inlined silently — there is no separate validation verdict.
+- `eval rules plan`: preflight tasks, arms, graders, frozen-baseline reuse, cost confidence, missing pricing/cost data, and cheaper alternatives without writing runtime artifacts or launching evaluator work. This is the last cheap step — the next command, `stet eval rules` without `--plan`, is the charged launch.
 - `eval rules`: launch the bounded rules-backed run
 - `eval status`: explain the current phase or health
-- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage. Pass `--report-mode separate_axes|strict_publishable_pass` to pin the reporting mode when the baseline and candidate arms were produced by Stet binaries whose default drifted; baseline mode is used automatically otherwise.
+- `eval rules resume`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage. Pass `--parse-retries N` to forward grader JSON parse-repair attempts during regrade recovery. Pass `--report-mode separate_axes|strict_publishable_pass` to pin the reporting mode when the baseline and candidate arms were produced by Stet binaries whose default drifted; baseline mode is used automatically otherwise.
 - `eval report`: read the finished rollout decision
+
+`--ai-cmd` is a launch-only override for `stet eval rules`; use an absolute
+script path when launching from scratch directories. When the model under test
+should not grade its own work, persist `eval.grader_ai_cmd` and
+`eval.grader_ai_model_id` in `stet.suite.yaml` so validation graders use the
+same independent evaluator across reruns. Use `--grader-ai-cmd` plus
+`--grader-ai-model-id` only for one-off launch overrides.
 
 To iterate on a high-signal slice from an existing dataset, pass repeatable
 `--task-id <id>` to `eval rules plan` and `eval rules`, or put the stable slice
@@ -143,6 +150,8 @@ stet eval report --change-manifest .stet/skill-loops/planner/stet.change.yaml --
 Use the `--plan` form before launch when the operator needs a budget decision;
 it does not write the wrapper bundle, build the replay dataset, or launch
 `eval rules`.
+For wrapper runs, put any `--ai-cmd` on the non-plan launch; the wrapper
+forwards it to delegated `stet eval rules`.
 If `stet eval rules plan` is blocked by commercial entitlement, treat that as an
 access/preflight limitation rather than evidence that the manifest is invalid.
 

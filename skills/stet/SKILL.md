@@ -136,8 +136,9 @@ Rules for the optimizer:
   read aggregate model sets plus status from `decision_receipt.graders`.
 - For custom graders, verify expected grader IDs are present in
   `decision_receipt.compare.grader_coverage`, `experiment.json.graders`, or arm
-  `decision_metrics.graders` before issuing a verdict. Missing expected grader
-  coverage is degraded evidence.
+  `decision_metrics.graders` before issuing a verdict. Explicitly requested
+  grader coverage that is missing or asymmetric should fail closed to
+  `inspect`; one-sided graders are coverage evidence, not comparison math.
 - For installed MVP binaries, use the private dist repo update flow:
   `stet --version`, `stet update`, or `stet update --version <tag>`. Pilot
   users need access to `benredmond/stet-dist`, not the private source repo.
@@ -190,6 +191,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | "Compare baseline vs candidate" | `stet eval compare` | [compare-and-checkin](references/compare-and-checkin.md) |
 | "What is this run doing?" | `stet eval status` | [compare-and-checkin](references/compare-and-checkin.md) |
 | "Repair missing additive grader coverage on a finished run" | `stet runs repair-ai-coverage` or `stet runs regrade-graders` | [compare-and-checkin](references/compare-and-checkin.md) |
+| "Why is this root taking so much disk?" / "Can I reclaim raw artifacts?" | `stet artifacts status --root <root>` then `stet artifacts compact --root <root>` if not pinned | [compare-and-checkin](references/compare-and-checkin.md) |
 | "Resume an incomplete rules compare" | `stet eval rules resume` | [rules-flow](references/rules-flow.md) |
 | "Set up evals for this repo" | author `.stet/harbor.Dockerfile` + `.stet/stet.harness.yaml`, then `stet init` and `stet suite discover` | [onboarding](references/onboarding.md) |
 | "Build a large dataset (50+ tasks)" | `stet suite discover` + `stet suite build` | [dataset-build](references/dataset-build.md) |
@@ -210,6 +212,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | Config A/B (prefilter only) | Fast file-level directional read without rollout state | `stet probe --file` / `stet eval config-diff` |
 | Context-first selection | Model, reasoning-level, or harness-setting choice on a repo with Stet history | `stet context --repo <repo> --json` -> reuse/report or pinned `stet eval run` |
 | Quick smoke | First multi-model read with no usable Stet history | `stet eval smoke` |
+| Artifact retention | Inspect or reclaim raw rescue artifacts | `stet artifacts status --root <root>` -> `stet artifacts compact --root <root>`; use `pin` / `unpin` for operator-retained roots |
 | Pairwise compare | Baseline vs candidate | `stet eval compare` -> `stet eval report` |
 | Baseline-first | Freeze reusable evidence, then compare candidates without rerunning the baseline arm | `stet baseline freeze` -> `stet eval compare --baseline` |
 | New skill A/B | Check whether adding a skill changes agent behavior | baseline absent/effectively empty skill -> choose test posture -> custom behavior graders -> `stet eval rules` |
@@ -269,10 +272,15 @@ models, setting up a repo, improving a skill, or checking a release?"
 - For completed reads, prefer persisted `eval_report.v1.json`; read
   `decision_receipt`, then `trial_context`, then lower-level artifacts only for
   diagnosis. For active reads, prefer `stet eval status --json`.
+- For disk pressure, read `stet artifacts status --root <root>` before
+  deleting anything manually. Compacted roots keep `patch_retention.v1.json`
+  contracts and report `regrade_capability`; `bounded_only` means decision
+  metadata remains but full raw-patch regrade requires a rerun or archive.
 - If requested grader coverage is part of the decision, verify the expected
   grader IDs in `decision_receipt.compare.grader_coverage`,
-  `experiment.json.graders`, or arm `decision_metrics.graders`. Missing
-  expected coverage is degraded evidence and should fail closed to `inspect`.
+  `experiment.json.graders`, or arm `decision_metrics.graders`. Missing or
+  asymmetric explicit coverage should fail closed to `inspect`; one-sided
+  graders are excluded from rollout recommendations.
 - Recover incomplete or under-graded roots with the ordered commands emitted by
   `stet eval status` or `stet eval report`: usually
   `stet runs repair-ai-coverage ...`, then `stet runs regrade-graders ...`.
@@ -333,6 +341,18 @@ Decision shortcuts:
 - AGENTS.md/CLAUDE.md treatments are disk overlays, not prompt injection. Harbor
   stages them outside `/app`, installs through existing symlink targets, and
   commits the overlay baseline so captured patches exclude treatment churn.
+- Historical tasks default to the repo's current root `AGENTS.md` and
+  `CLAUDE.md` at materialize time. These convention files replace any
+  historical copies after `repo.tar.gz`, are committed into the task baseline
+  when git history is available, and are excluded from captured agent patches;
+  explicit rules/config-diff overlays still apply later and take precedence for
+  the selected arm.
+- Dataset images ship with `install_config.pre_install` and `install` baked in
+  at build time, so the agent's first turn can run the project test command
+  directly (`pnpm vitest`, `cargo test`, `go test ./...`, `pytest`, etc.)
+  without `pnpm install` / `cargo fetch` / `go mod download` / `bundle install`
+  / `uv sync` first. Missing or wrong install steps surface deterministically
+  at `docker build` rather than as silent first-turn flakes.
 - Docker capacity is shared across Harbor task concurrency, model workers,
   validation workers, and command workers. When Docker Desktop cannot allocate
   more memory, keep effective concurrency explicit: harness pressure is roughly

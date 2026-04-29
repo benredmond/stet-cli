@@ -95,8 +95,8 @@ Quality onboarding rules:
   Do not put the token in shell profiles, repo `.env` files, or committed
   config. For one-off automation, use command-scoped env:
   `CLAUDE_CODE_OAUTH_TOKEN=<token> stet ...`. Stet also accepts Claude
-  credential JSON, Anthropic API/auth token env vars, or the macOS
-  `Claude Code-credentials` Keychain item.
+  credential JSON or Anthropic API/auth token env vars. Stet does not read
+  Claude credentials from the macOS Keychain by default.
 - `stet init --yes` stays low-friction and does not enable quality bundles by
   default. Silent auto-init paths should keep bundle selection empty until an
   operator opts in.

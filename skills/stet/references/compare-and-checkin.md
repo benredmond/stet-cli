@@ -47,6 +47,15 @@ stet eval compare \
   --json
 ```
 
+Compare-only staging hardlinks immutable `runs/**` artifacts and copies mutable
+metadata such as `reports/` and `validation/`. Put `--out` on the same
+filesystem as reused roots; if hardlinks fail, compare fails instead of copying
+large agent artifacts such as `agent.patch`.
+
+Harbor patch capture should honor the task repo's `.gitignore` before Stet's
+cache/build denylist runs. If ignored environment artifacts appear in
+`agent.patch`, diagnose patch capture before judging model quality.
+
 Or with two plain files that should be evaluated as one logical repo path:
 
 ```bash
@@ -180,13 +189,17 @@ Machine-readable default:
   fields before summarizing a winner.
 - Within `decision_receipt.compare`, prefer `failure_taxonomy`,
   `grader_coverage`, and `task_flips` before scraping per-task artifacts.
+- Compare automatically includes explicit `--grader` entries plus any
+  additional grader that has usable aggregate evidence on both arms. Graders
+  present on only one arm, missing on all tasks, or unavailable are excluded
+  from comparison math and rollout recommendations, but remain visible in
+  `grader_coverage` as asymmetric or missing evidence.
 - For AGENTS.md, CLAUDE.md, skill, or policy compares where custom, bundled, or
   repo-configured quality graders are expected, verify those grader IDs survived
   into `grader_coverage`,
   `experiment.json.graders`, or arm `decision_metrics.graders` before giving a
-  final verdict. If built-in compare signals exist but the expected additive
-  graders are absent, treat the result as degraded evidence and fail closed to
-  `inspect`.
+  final verdict. If an explicitly requested additive grader is asymmetric or
+  absent, fail closed to `inspect`.
 - For custom rubric compares, keep the exact rubric file path in follow-up
   commands and receipts. If the operator asked for
   `--grader /path/to/custom.yaml`, reruns, config-diff repros, and
@@ -197,6 +210,9 @@ Machine-readable default:
   `stet runs regrade-graders --repo <repo> --from-repo-quality`; this preserves
   the completed harness/test evidence and regenerates run summaries from
   canonical task details.
+- LLM-backed grader repairs must carry evaluator provenance. When overriding
+  the evaluator command, pass the true `--ai-model-id`; deterministic graders
+  such as `footprint_risk` should not be treated as missing LLM provenance.
 - If `validity` is partial/invalid, `evidence_quality` is degraded/insufficient,
   or status/report surfaces contradict each other, lower confidence and fail
   closed to `inspect`.
