@@ -2,6 +2,8 @@
 
 Stet is change control for AI coding behavior. It replays real repo work and scores the output so you can safely ship model, config, and skill changes.
 
+> **Stet is an agent-first tool.** It is designed to be driven by a coding agent (Claude Code, Cursor, Codex, etc.), not run by a human at the terminal. The fastest way to install and use Stet is to **point your agent at this README** and let it run the setup, onboarding, and evals for you.
+
 Stet is installed in two parts:
 
 - the `stet` CLI, which runs evaluations and manages artifacts
@@ -36,25 +38,25 @@ The agent picks the right Stet surface (quick probe, full eval, baseline rerun) 
 
 ```sh
 gh auth status || gh auth login
-gh repo view benredmond/stet-dist --json visibility,url
+gh repo view benredmond/stet-cli --json visibility,url
 ```
 
 ### 2. Install the Stet CLI
 
 ```sh
-gh api repos/benredmond/stet-dist/contents/install.sh --header "Accept: application/vnd.github.raw" | sh
+gh api repos/benredmond/stet-cli/contents/install.sh --header "Accept: application/vnd.github.raw" | sh
 ```
 
 Install a specific version:
 
 ```sh
-gh api repos/benredmond/stet-dist/contents/install.sh --header "Accept: application/vnd.github.raw" | sh -s -- --version v0.1.0
+gh api repos/benredmond/stet-cli/contents/install.sh --header "Accept: application/vnd.github.raw" | sh -s -- --version v0.1.0
 ```
 
 The default install directory is `$HOME/.local/bin`. To use a different directory:
 
 ```sh
-gh api repos/benredmond/stet-dist/contents/install.sh --header "Accept: application/vnd.github.raw" | sh -s -- --bin-dir "$HOME/bin"
+gh api repos/benredmond/stet-cli/contents/install.sh --header "Accept: application/vnd.github.raw" | sh -s -- --bin-dir "$HOME/bin"
 ```
 
 Verify:
@@ -68,19 +70,19 @@ stet --version
 This is a first-class part of setup, not an optional add-on. Agents need the skill to route questions to the right Stet surface, preserve decision semantics, read canonical artifacts, and avoid treating directional checks as rollout evidence.
 
 ```sh
-npx skills add git@github.com:benredmond/stet-dist.git --skill stet
+npx skills add git@github.com:benredmond/stet-cli.git --skill stet
 ```
 
 To inspect the skill before installing:
 
 ```sh
-npx skills add git@github.com:benredmond/stet-dist.git --list
+npx skills add git@github.com:benredmond/stet-cli.git --list
 ```
 
 If your environment has HTTPS git credentials configured for GitHub, the shorthand also works:
 
 ```sh
-npx skills add benredmond/stet-dist --skill stet
+npx skills add benredmond/stet-cli --skill stet
 ```
 
 If your agent supports separate project-level and global skill installs, prefer the install scope that the agent will actually load during Stet work. Verify the skill is visible before running evaluations:
@@ -164,6 +166,31 @@ automation where a file is not appropriate, scope the variable to the command:
 
 Stet also accepts `CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN`. Stet does not read Claude credentials from the macOS Keychain by default. If Claude is selected and none are present, Stet fails before launching the run.
 
+## Getting started: onboard your repo
+
+Once the CLI and skill are installed, ask your agent to onboard the repo. The `stet` skill knows the full onboarding flow — reading CI to pick the real test command, authoring the Harbor environment, mining a candidate pool from merged PRs, and building a starter dataset.
+
+In your agent, invoke the skill directly:
+
+```
+/stet onboard my repo
+```
+
+Or just ask in plain language — the skill is triggered by phrases like "onboard this repo", "set up evals", or "build a dataset":
+
+```
+Onboard my repo for Stet evals.
+```
+
+Your agent will:
+
+1. Read the repo's CI workflow and pick the real repo-level test command.
+2. Author `.stet/harbor.Dockerfile` and `.stet/stet.harness.yaml` for this repo.
+3. Run `stet init`, `stet suite discover`, and `stet suite build` to mine real merged PRs into a replayable task corpus.
+4. Return an onboarding receipt with a suggested starter slice so you can run your first probe or model comparison.
+
+After onboarding, drive evals in natural language — see [What you can ask your agent](#what-you-can-ask-your-agent) above for examples.
+
 ## Update and roll back
 
 ```sh
@@ -178,7 +205,7 @@ stet update --version v0.1.0       # pin or roll back
 
 **`stet` not found after install** — add the install directory to `PATH`.
 
-**GitHub auth or access errors** — run `gh auth status` and verify repo access with `gh repo view benredmond/stet-dist`.
+**GitHub auth or access errors** — run `gh auth status` and verify repo access with `gh repo view benredmond/stet-cli`.
 
 **Docker unavailable** — start Docker Desktop on macOS or the Docker service on Linux, then rerun `docker info`.
 
