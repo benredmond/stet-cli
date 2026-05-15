@@ -73,9 +73,10 @@ Canonical read path:
    `arms` to interpret the verdict. A good score on degraded evidence is still
    degraded evidence.
    When evidence is not decision-grade, check
-   `evidence_quality.directional_read`. A usable directional read can guide
-   iteration or prefilter candidates, but should not be treated as a promote or
-   rollback decision without more tasks or clean validity.
+   `evidence_quality.directional_read`. A `usable` or `limited` directional
+   read can guide iteration or prefilter candidates, but should not be treated
+   as a promote, rollback, or superiority decision without more tasks or clean
+   validity.
 6. Drill into lower-level artifacts only for diagnosis:
    `experiment.json` for compare evidence authority, `release.v1.json` for
    lifecycle authority, `task_decision.json` for task authority,
@@ -104,10 +105,31 @@ Rules for the optimizer:
   change the Search Space.
 - Trust the Trial Result's `next_action` and lifecycle posture unless there is
   clear contradictory evidence. Mixed, stale, missing, or partial evidence
-  fails closed to `inspect` or repair/resume. If status or report exposes
+  fails closed for promotion and rollback: do not call it safe to ship. If the
+  operator requested optimization and `evidence_quality.directional_read.status`
+  is `usable` or `limited`, treat `inspect` as a caveated iteration signal:
+  explain the evidence limit, choose one bounded next lever or scale-up rerun,
+  and continue the loop. If status or report exposes
   `repair.code=GRADE_CUSTOM_REPAIRABLE`, run the emitted
   `stet eval rules repair ... --json` command; it reuses validation artifacts
-  and reruns only the affected custom grader coverage.
+  and reruns only the affected custom grader coverage. Typed grader-failure
+  counters (`malformed_count`, `parse_attempt_count`, `repairable_count`, and
+  `public_failure_kind_counts`) are surfaced per arm on
+  `eval status`/`eval report` grader coverage and per grader on the
+  decision-receipt `compare.graders`/`run.graders` entries; canonical kinds
+  are `malformed_json`, `schema_invalid`, `range_invalid`,
+  `unsupported_signal`, `timeout`, `auth`, `config`, `unknown`.
+- When a rules change declares `change.rules.checkpoint_suite` or
+  `change.rules.holdout_suite`, keep normal optimization on the iteration suite.
+  Use checkpoint sparingly as validation feedback, not the target. Run holdout
+  only for the finalist; read `study.readiness` in `eval_report.v1.json`.
+  A declared holdout must pass before the result is decision-grade or promotable.
+- For rules and rules-skill runs, `no_gold_pass_commands`,
+  `all_commands_ignored_gold_failure_mode_unset`, or a candidate smoke
+  preflight failure before `experiment.json` means the selected replay
+  evidence is not gold-valid yet. Treat it as a dataset/slice validity problem,
+  not model-quality evidence or proof that current-checkout tests are broken;
+  diagnose why the verifier failed before choosing a bounded next action.
 - Distinguish release promotion from baseline refresh. Promotion changes
   rollout state; baseline refresh changes the frozen reference for future
   searches.
@@ -237,7 +259,7 @@ models, setting up a repo, improving a skill, or checking a release?"
 | Pairwise compare | Baseline vs candidate | `stet eval compare` -> `stet eval report` |
 | Baseline-first | Freeze reusable evidence, then compare candidates without rerunning the baseline arm | `stet baseline freeze` -> `stet eval compare --baseline` |
 | New skill A/B | Check whether adding a skill changes agent behavior | baseline absent/effectively empty skill -> choose test posture -> custom behavior graders -> `stet eval rules` |
-| Rules skill loop | Replay-backed shared skill improvement on the canonical rules surface | `stet eval rules skill --plan` -> `stet eval rules skill` -> `stet eval status` -> `stet eval report`. Both plan and launch require `--skill`, `--repo`, `--model`, `--goal`, and `--out`. |
+| Rules skill loop | Replay-backed shared skill improvement on the canonical rules surface | `stet eval rules skill --plan` -> `stet eval rules skill` -> optional `stet eval rules checkpoint` -> finalist `stet eval rules holdout` -> `stet eval report`. Both plan and launch require `--skill`, `--repo`, `--model`, `--goal`, and `--out`; normal cycles remain iteration-only. |
 | Repo onboarding | New repo, no dataset yet | author harness Dockerfile -> `stet init` -> `stet suite discover` -> `stet suite build` |
 | Dataset eval | Reusable benchmark | `stet suite build` -> `stet eval run` -> `stet eval report` |
 | Workbench probe | Iterative artifact improvement | `stet eval workbench probe` -> `stet eval report` -> `stet eval workbench gate` |

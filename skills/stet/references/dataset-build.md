@@ -247,6 +247,19 @@ Inline audit at target count:
 
 Update `agent_docs/datasets.md` with the finalized recipe.
 
+## Prompt shape (`--prompt-shape`)
+
+`stet suite build` defaults to `--prompt-shape self-contained-natural`, which
+emits the manifest-enriched `ai_task` (imperative goal-first prose) verbatim and requires
+the manifest path. Without `ai_task`, the implicit default warns per task and
+falls back to the legacy chain (PR body → AI summary → title → commit
+messages); passing `--prompt-shape self-contained-natural` explicitly fails
+those tasks with skip reason `prompt_shape_requires_ai_task` instead of
+degrading silently. Pass `--prompt-shape legacy` to opt out entirely. Every
+task records the decision under `meta.prompt_provenance` in `task.yaml`, and
+`build-summary.json` reports `prompt_shape_fallbacks` plus
+`prompt_shape_explicit_failures`.
+
 ## Flow-Specific Actions
 
 Each phase checkpoint maps to keyed actions:

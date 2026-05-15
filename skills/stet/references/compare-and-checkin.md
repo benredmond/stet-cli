@@ -228,6 +228,19 @@ Machine-readable default:
 - If `evidence_quality.factors` includes `signal=provenance` or
   `evidence.mixed_arm_provenance`, treat the compare as inspect-only until the
   affected arm is rerun or repaired.
+- Authorized smoke-seeded tasks pass silently: their authorization is recorded
+  as a `smoke_preflight` phase in `experiment.json` `task_provenance.arms[*].phases`,
+  with `evidence_quality.factors` left at `ok` for provenance.
+- When `mixed_arm_provenance` does fire on a frozen-baseline compare, read the
+  per-arm `smoke_suspected_task_ids`, `smoke_source_root_path`, and
+  `recommended_action` fields before deciding what to repair:
+  - `recommended_action="repair_frozen_baseline_smoke_evidence"` means smoke
+    artifacts were found but failed strict authorization (e.g., harness
+    mismatch, legacy baseline without persisted smoke evidence). Re-freeze the
+    baseline with the current `stet` build so `evidence.smoke_preflight` is
+    populated, or rerun the affected arm with `--skip-smoke-preflight`.
+  - `recommended_action="rerun_affected_arm"` means the leftover artifacts are
+    not smoke-shaped; rerun or repair the arm before claiming results.
 
 The `failure_taxonomy` field in compare JSON also carries these counts so
 programmatic consumers can distinguish `no_patch` from ordinary test failures.

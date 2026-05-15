@@ -57,6 +57,9 @@ Have:
 - inspectable artifacts when logs are not enough
 - an explicit stop rule (separate overall and judge thresholds)
 - a known Search Space, so the agent knows which lever may change next
+- separate study suites when the corpus is small or credibility matters:
+  iteration for learning, optional checkpoint for sparse validation feedback,
+  and holdout for the finalist
 
 If the grader is mushy, split or calibrate the rubric first with
 [rubric-authoring](rubric-authoring.md).
@@ -109,6 +112,23 @@ stet eval report \
   --change-manifest .stet/skill-loops/planner/stet.change.yaml \
   --json
 ```
+
+If the generated or hand-written change manifest declares
+`change.rules.checkpoint_suite` or `change.rules.holdout_suite`, do not run those
+suites during normal cycles. `stet eval rules skill` records the suite paths but
+delegates only the iteration suite. Use:
+
+```bash
+stet eval rules checkpoint --change-manifest .stet/skill-loops/planner/stet.change.yaml --json
+stet eval rules holdout --change-manifest .stet/skill-loops/planner/stet.change.yaml --json
+```
+
+Checkpoint output is full diagnostic feedback, but treat it as validation
+feedback after meaningful changes, plateaus, or low-n wins that look too good.
+Holdout is finalist-only by default. The report's `study.readiness` is
+`iteration_only`, `checkpoint_regressed`, `ready_for_holdout`,
+`holdout_failed`, or `decision_grade`; a declared holdout must pass before
+promotion or public study claims.
 
 Read `decision_receipt` first, then `evidence.skill_loop_path`. The linked
 `skill_loop.v1.json` is the loop ledger: it carries cycle, best/latest scores,
@@ -169,8 +189,12 @@ If any criterion fails, keep iterating or calibrate.
 - If the artifact looks better but the score stays flat, inspect rubric trust.
 - If the candidate wins clearly and the weakest remaining risk is acceptable,
   gate or ship.
-- If evidence is partial, stale, missing requested graders, or outside the
-  declared Search Space, inspect or repair/resume before another edit.
+- If evidence is stale, missing requested graders, or outside the declared
+  Search Space, inspect or repair/resume before another edit. If a complete
+  compare is non-decision-grade only because of sample size/history and
+  `evidence_quality.directional_read.status` is `limited`, use it for one
+  hypothesis-backed iteration only when the operator requested optimization;
+  record the caveat and do not make rollout or superiority claims.
 - If the candidate wins a baseline-first loop, refresh the baseline reference;
   do not describe that as release promotion.
 
@@ -186,3 +210,6 @@ If any criterion fails, keep iterating or calibrate.
 - Using thread memory instead of a durable loop log.
 - Reconstructing the verdict from summaries when a persisted Trial Result is
   available.
+- Re-running checkpoint so often that it becomes another optimization target.
+- Reading holdout task-level diagnostics as normal loop feedback instead of
+  using the aggregate result to decide whether the finalist is credible.

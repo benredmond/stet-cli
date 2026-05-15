@@ -35,8 +35,8 @@ stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
 Roles:
-- `manifest resolve`: inspect normalized inputs before launch. Prints the canonical resolved change manifest as YAML (or JSON with `--json`); injected defaults (e.g. `context.baseline.source`, `context.candidate.source`, `policy.version`, `treatments[*].path`) are inlined silently — there is no separate validation verdict. `--json` formats the success path only; on a malformed manifest, `manifest resolve` exits non-zero and emits a plain-text stderr line regardless of `--json`. A non-zero exit is the validation contract — treat it as "malformed manifest" and read stderr for the field-precise reason.
-- `eval rules plan`: preflight tasks, arms, graders, frozen-baseline reuse, cost confidence, missing pricing/cost data, and cheaper alternatives without writing runtime artifacts or launching evaluator work. This is the last cheap step — the next command, `stet eval rules` without `--plan`, is the charged launch. The plan output's `task_selection_adequacy.verdict` is informational; values such as `insufficient_history` describe historical sample size for confidence calibration and do not block launch.
+- `manifest resolve`: inspect normalized inputs before launch. Prints the canonical resolved change manifest as YAML (or JSON with `--json`); injected defaults (e.g. `context.baseline.source`, `context.candidate.source`, `policy.version`, `treatments[*].path`) are inlined silently — there is no separate validation verdict. On a malformed manifest, `manifest resolve` exits non-zero; without `--json` it emits a plain-text stderr line, and with `--json` it emits a structured `{"error": {"code", "message", "field"}}` envelope on stdout. A non-zero exit is the validation contract — treat it as "malformed manifest" and read `error.code` / `error.field` (or the stderr line) for the field-precise reason.
+- `eval rules plan`: preflight tasks, arms, graders, frozen-baseline reuse, cost confidence, missing pricing/cost data, and cheaper alternatives without writing runtime artifacts. It does not launch the charged compare, but it is not free: plan runs the Harbor `oracle`-agent gold-replay validation containers to populate `replay_validity` and runs the LLM-grader preflight, so under contention it routinely takes 8–10+ minutes. A future `--quick-plan` that skips replay validation does not exist yet; when an operator needs a sub-minute readiness check, reach for `stet manifest resolve` instead. The next command, `stet eval rules` without `--plan`, is the charged launch. The plan output's `task_selection_adequacy.verdict` is informational; values such as `insufficient_history` describe historical sample size for confidence calibration and do not block launch.
 - `eval rules`: launch the bounded rules-backed run
 - `eval status`: explain the current phase or health
 - `eval rules repair`: recover an incomplete rules compare from the persisted runtime; when the surface is replayable, it can resume a baseline-phase compare or rerun a missing/partial candidate arm while preserving completed evidence, then repair/regrade missing coverage. `eval rules resume` remains accepted for compatibility. Pass `--parse-retries N` to forward grader JSON parse-repair attempts during regrade recovery. Pass `--report-mode separate_axes|strict_publishable_pass` to pin the reporting mode when the baseline and candidate arms were produced by Stet binaries whose default drifted; baseline mode is used automatically otherwise.
@@ -136,6 +136,31 @@ Candidate arms are preferred over baseline arms for that single smoke. Successfu
 smoke artifacts are seeded into the canonical root so smoked tasks count toward
 the full run.
 
+## Replay-Invalid Smoke
+
+If smoke fails before `compare/experiment.json` with
+`no_gold_pass_commands`, `all_commands_ignored_gold_failure_mode_unset`, or
+`tests_unknown_all_commands_ignored_gold_failure_mode_unset`, the selected
+slice is not gold-valid evidence yet. Do not treat that as model quality, a
+rollout decision, or proof that current-checkout tests are broken.
+
+First diagnose the verifier failure. Read `stet eval status
+--change-manifest ... --json`, `stet eval report --change-manifest ... --json`,
+the failed arm root, and per-task `validation.json` / `task_detail.json`
+artifacts. Identify the task IDs, verifier commands, `gold_outcome`,
+`gold_failure_mode`, `partial_score_reason`, and stdout/stderr hints. Explain
+the likely cause before choosing an action: for example a path-sensitive test,
+stale command, missing selector, container-only failure, archived dependency
+drift, too-narrow slice, bad generated task, or another concrete replay issue.
+
+Choose a bounded next action from that diagnosis. It may be a different task
+slice, adjusted task selection, an already-known gold-valid test command, or an
+inspect-only stop when no safe recovery is justified. Relaunch only after the
+evidence input changes, or after you can explain why the same input is now
+plausibly gold-valid. STET-340 tracks a product-supported gold-replay preflight;
+until that exists, preserve inspect-only caveats and avoid rollout claims until
+a gold-valid compare completes.
+
 ## Default Quality Graders
 
 For non-skill treatments (AGENTS.md, CLAUDE.md, model_update, harness_bundle,
@@ -147,6 +172,11 @@ evidence on the first run without requiring post-hoc `regrade-graders`.
 The rules-default profile bundles **7 graders total**: the coding-quality trio
 (`equivalence`, `code_review`, `footprint_risk`) plus 4 quality graders — the
 `discipline` bundle (`clarity`, `simplicity`, `coherence`) and `intentionality`.
+If the repo pins a `quality:` profile in `.stet/stet.yaml` (e.g.,
+`craft+discipline`), the rules-default seven are REPLACED by the pinned set
+(typically 10–11 graders, adding `robustness`, `instruction_adherence`,
+`scope_discipline`, `diff_minimality`, and the craft graders) — see
+`quality_profile.source` in plan output to confirm which path resolved.
 This is distinct from the **leaderboard** profile used for model-comparison
 runs, which bundles the full **8 craft + discipline graders** (`clarity`,
 `simplicity`, `coherence`, `intentionality`, `robustness`,

@@ -183,7 +183,8 @@ stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 - Fresh `stet eval run` performs one representative smoke pre-pass before
   canonical work; it does not multiply smoke runs by model or reasoning arm.
   Successful smoke artifacts are seeded into the canonical root so smoked tasks
-  count toward the full run.
+  count toward the full run. Pass `--skip-smoke-preflight` only when the dataset
+  has already been smoked (mirrors the same flag on `stet eval rules`).
 - To compare reasoning levels, keep the model fixed and use first-class
   reasoning arms: `stet eval run --dataset <dataset> --model <model> --reasoning-efforts max,xhigh,high,low --out <out>`.
   Add `--pinned-task-source` and `--pinned-dataset-key` when reusing prior Stet
