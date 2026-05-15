@@ -4,6 +4,8 @@ Stet is change control for AI coding behavior. It replays real repo work and sco
 
 > **Stet is an agent-first tool.** It is designed to be driven by a coding agent (Claude Code, Cursor, Codex, etc.), not run by a human at the terminal. The fastest way to install and use Stet is to **point your agent at this README** and let it run the setup, onboarding, and evals for you.
 
+> **Reading this yourself?** See [`ONBOARDING.md`](ONBOARDING.md) for a short, human-readable explainer of what Stet is doing under the hood — task selection, replay, and grading.
+
 Stet is installed in two parts:
 
 - the `stet` CLI, which runs evaluations and manages artifacts
