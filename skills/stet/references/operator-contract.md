@@ -22,8 +22,10 @@ Ordinary output roots commonly persist it at
 persist it next to the resolved rules runtime under `.stet/eval-rules/...`.
 When the locator is unclear, use the matching `stet eval report --out ... --json`
 or `stet eval report --change-manifest ... --json` command to locate or
-materialize it. Read `decision_receipt` for decision, confidence, readiness,
-grader coverage, and next action. Read top-level `trial_context` for task
+materialize it. Read `decision_receipt` for recommendation, confidence, readiness,
+grader coverage, and next action (the verdict string lives on
+`decision_receipt.recommendation`; the top-level `lifecycle.decision`
+sibling mirrors it). Read top-level `trial_context` for task
 corpus, task selection, Harness Surface, Search Space, baseline/candidate,
 supporting evidence, freshness, and raw machine recommendation refs.
 
@@ -165,7 +167,7 @@ Defined in their reference docs. Context disambiguates overloaded keys.
 | `[p]` | promote | release-lifecycle, rules-flow | Persist gated win as release state |
 | `[p]` | probe | onboarding | Approve slice and launch first run |
 | `[p]` | repair | compare-and-checkin | Repair missing quality evidence |
-| `[c]` | resume compare | compare-and-checkin, rules-flow | Finish grader coverage for incomplete compare |
+| `[c]` | repair compare | compare-and-checkin, rules-flow | Finish grader coverage for incomplete compare |
 | `[g]` | retry grader | compare-and-checkin | Finish retryable artifact-graded task |
 | `[t]` | revalidate | compare-and-checkin | Rerun tests only |
 | `[t]` | status | release-lifecycle | Read-only posture check |

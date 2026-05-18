@@ -8,7 +8,7 @@ manifest resolve ──► eval rules plan ──► eval rules ──► status
                                                         │          │
                                                     [w] wait   [p] promote  [i] inspect  [s] stop
                                                         │
-                                                    [c] resume compare
+                                                    [c] repair compare
 ```
 
 Use this for manifest-backed change control.
@@ -30,7 +30,7 @@ stet manifest resolve --change-manifest .stet/rules/stet.change.yaml
 stet eval rules plan --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml --json
 stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml
 stet eval status --change-manifest .stet/rules/stet.change.yaml --json
-stet eval rules resume --change-manifest .stet/rules/stet.change.yaml --json
+stet eval rules repair --change-manifest .stet/rules/stet.change.yaml --json
 stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
@@ -47,8 +47,8 @@ means metadata is `resolved`, `unresolved`, or `stale`; `arm_evidence` means
 compare arm artifacts are `none`, `partial`, `running`, `complete`, or `failed`;
 `compare_decision` means the decision is `reportable`, `missing_experiment`,
 `inconsistent`, or `blocked_until_report`. If arm evidence exists but
-`experiment.json` is missing, the decision remains inspect-only. Resume with
-`stet eval rules resume --change-manifest ... --json` when the launch exited or
+`experiment.json` is missing, the decision remains inspect-only. Repair with
+`stet eval rules repair --change-manifest ... --json` when the launch exited or
 stalled; use `--restart` only to discard evidence.
 
 The envelope also carries a top-level `activity_state` of `running`, `stalled`,
@@ -122,11 +122,18 @@ To iterate on a high-signal slice from an existing dataset, pass repeatable
 in the suite manifest as `selection.task_ids`. Task IDs must match ready task
 directories in `eval.dataset`.
 
+Put stable variance controls in the suite manifest under `eval:`:
+`task_order_seed`, `workers`, `model_workers`, `harbor_concurrency`, and
+`harness_cli_cache`. `stet eval rules` accepts matching CLI flags for temporary
+overrides; CLI values take precedence over suite YAML. `stet eval rules skill`
+also accepts `--task-order-seed` and writes it into its synthesized iteration
+suite; omit the flag for fresh per-run randomness.
+
 `stet eval rules` is non-destructive by default when a matching rules runtime
 already exists. It reuses completed evidence, auto-resumes candidate-phase
 partial evidence when Stet can prove the replay is safe, and refuses to discard
 partial arm evidence. Use `stet eval status --change-manifest ...` before any
-recovery decision, then `stet eval rules resume --change-manifest ... --json`
+recovery decision, then `stet eval rules repair --change-manifest ... --json`
 when the active process has exited or status is stalled. Use `--restart` only
 when intentionally discarding existing evidence and starting over.
 
@@ -450,7 +457,16 @@ over unchanged evidence is a read path: it must not advance the loop cycle.
 
 For harness-bundle guards, keep the public/private boundary straight:
 - `stet.harness/v1` is still the minimal public input manifest.
+- Claude Code hooks are represented as Claude settings, not as a Stet hook DSL. Put the customer-authored project settings file at `.claude/settings.json` and declare every repo-local hook script or hook directory in the harness manifest:
+  ```yaml
+  claude_code:
+    settings_path: .claude/settings.json
+    hook_files:
+      - .claude/hooks/
+  ```
+  Stet resolves those files from the same baseline/candidate source as the harness manifest, rejects unsafe paths/symlinks/URLs and undeclared repo-local command files, stages them for `agent: claude-code`, and hashes the settings plus hook files and executable modes into `harness_surface`.
 - The richer executed evidence lives below that boundary as `harness_surface` inside `rules_runtime.v1.json`, `stet eval report --change-manifest --json`, and `release.v1.json`. Harness-bundle runs use `kind: harness_bundle`; ordinary `agents_md` / `claude_md` runs use `kind: instruction_surface` unless the suite uses the repo default `.stet/stet.harness.yaml` or supplies `eval.harness`, which records `kind: runtime_harness`.
+- Hook execution observability is currently conservative: `runner_runtime.v1.json` records the configured hook count, settings digest, hook file digests, executable modes, `execution_status: unobserved`, `failure_category: harness_hook_failure`, zero observed failures/timeouts unless stable telemetry is present, and `observability: session_log_only`. Do not claim hooks improved quality without a completed repo eval and a report showing both quality and runtime deltas.
 - If the rules launch also declares `change.rules.search_space: ./stet.search_space.yaml`, the public `stet.search_space/v1` manifest stays requested-contract only while runtime and rules reports project the executed `search_space` object plus `search_space_path` and `search_space_digest` with `source=requested_manifest`. Without that manifest, rules runtime still emits `search_space` with `source=runtime_default` so the effective bounded context is always present. `release.v1.json` carries the same nested `search_space` object and tracks the digest under freshness.
 - `manifest resolve` does not emit `harness_surface`, `search_space`, staged manifest paths, or other runtime-only provenance.
 
@@ -484,7 +500,7 @@ to silence it.
 Flow-specific action:
 - `[p] promote`: `stet promote --change-manifest .stet/rules/stet.change.yaml --reason "..."`
 - `[P] promote override`: `stet promote --change-manifest .stet/rules/stet.change.yaml --reason "..." --allow-inspect` when trust remains `inspect` and the operator is intentionally overriding the gate
-- `[c] resume compare`: `stet eval rules resume --change-manifest .stet/rules/stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because resume reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md overlays from the change manifest. Resume cannot recover a terminal arm failure: when status/report emit a `repair` block with code `RULES_COMPARE_ARM_FAILED` or `RULES_ACTIVE_ARM_FAILED`, inspect the failed arm root, address the harness failure (auth, config, missing bundle, etc.), then relaunch instead of resuming
+- `[c] repair compare`: `stet eval rules repair --change-manifest .stet/rules/stet.change.yaml --json` when the persisted rules runtime exists but the canonical Trial Result is incomplete; use this for OOM/rate-limit interruptions before deleting the compare root, because repair reruns only missing/retryable arm tasks and can replay unchanged AGENTS.md/CLAUDE.md overlays from the change manifest. `resume` remains accepted as a compatibility alias. Repair cannot recover a terminal arm failure: when status/report emit a `repair` block with code `RULES_COMPARE_ARM_FAILED` or `RULES_ACTIVE_ARM_FAILED`, inspect the failed arm root, address the harness failure (auth, config, missing bundle, etc.), then relaunch instead of repairing
 - `[g] retry graders`: use the `repair-ai-coverage` or `regrade-graders` command emitted by report/status; add `--parse-retries N` for saved grader prompts that failed JSON/schema parsing
 - `[r] restart`: `stet eval rules --change-manifest .stet/rules/stet.change.yaml --suite-manifest .stet/rules/stet.suite.yaml --restart` only when the operator intentionally discards existing rules evidence for that change manifest
 
@@ -591,6 +607,13 @@ layers, so the candidate arm may start installer-heavy containers more
 synchronously than the baseline. Lower `--harbor-concurrency` to `2` and use
 `runner.harbor_args` memory overrides before rerunning.
 
+When evaluating Claude Code hooks, keep the hook files repo-relative and
+customer-authored under `.claude/`. Stet stages `.claude/settings.json` and the
+declared `hook_files` for Claude Code and invalidates cached evidence when any
+declared hook file digest or executable mode changes. Hooks that intentionally
+transform patches, validation inputs, or scoring artifacts are outside this
+first-cut contract.
+
 This applies the same runner config to both arms. It is runtime config, not the
 candidate treatment. Use `change.rules.harness` only with a `harness_bundle`
 treatment when the harness itself is the thing being evaluated. Do not add
@@ -610,6 +633,64 @@ eval:
 `stet eval rules` materializes the frozen benchmark baseline, runs only the
 candidate arm fresh, applies candidate-side treatments and overlays, records
 `frozen_baseline` provenance, and skips baseline phases.
+
+#### Baseline freshness gate (STET-375)
+
+A frozen benchmark baseline is a snapshot of grader scores against a specific
+harness surface (AGENTS.md, CLAUDE.md, skills bundle). When the surrounding
+harness changes between freeze time and replay time, the comparison is
+measuring harness drift rather than the candidate change. To make that
+visible:
+
+- `stet baseline freeze` records the baseline-arm harness surface digest on
+  the baseline via `--harness-surface-digest` / `--harness-surface-kind`. The
+  digest lives on the rules runtime artifact that produced the run you are
+  freezing. The artifact path is content-addressed (under
+  `.stet/eval-rules/<hash>/rules_runtime.v1.json`), so discover it from the
+  `evidence.rules_runtime_path` field of `stet eval report --json` rather
+  than hand-rolling the directory layout. For example:
+
+  ```bash
+  CHANGE=.stet/rules/stet.change.yaml
+  RUNTIME=$(stet eval report --change-manifest "$CHANGE" --json \
+    | jq -r .evidence.rules_runtime_path)
+  DIGEST=$(jq -er '.harness_surface.baseline_digest' "$RUNTIME") || {
+    echo "error: $RUNTIME has no harness_surface.baseline_digest; rerun stet eval rules to produce a post-STET-375 runtime artifact before freezing" >&2
+    exit 1
+  }
+  KIND=$(jq -er '.harness_surface.kind' "$RUNTIME")
+  stet baseline freeze \
+    --from "$(dirname "$RUNTIME")/compare/arms/baseline" \
+    --name my-baseline \
+    --harness-surface-digest "$DIGEST" \
+    --harness-surface-kind   "$KIND"
+  ```
+
+  `--from` must point at the baseline arm root (`.../compare/arms/baseline`),
+  not the compare root: `stet baseline freeze` resolves the benchmark baseline
+  from a single arm's `manifest.json` + `reports/summary.json`. Pointing at the
+  compare root would fall back to a snapshot freeze that silently drops the
+  `--harness-surface-*` flags and leaves the gate at `cache_status=unknown`.
+
+  The `jq -er` guard is load-bearing: with plain `jq -r`, a pre-STET-375
+  runtime artifact (`baseline_digest: null`) yields the literal string
+  `"null"`, which gets recorded as the digest and produces a nonsensical
+  `stale_detected` reason on every subsequent run. `-e` makes `jq` exit
+  non-zero on null so the freeze fails cleanly instead.
+
+  Baselines frozen before this gate, or frozen without these flags, replay
+  with `cache_status=unknown`.
+- Each `stet eval rules` run with `--baseline` recomputes the current harness
+  surface's baseline-arm digest, compares it to the recorded one, and labels
+  the baseline arm's `cache_status` in `eval_report.v1.json`:
+  - `hit` — digests match; frozen replay is sound
+  - `stale_detected` — digests diverge; a `WARNING` is logged and a
+    `Baseline cache_status` line appears in `stet eval status`
+  - `unknown` — recorded or current digest unavailable
+- The gate is soft: it never blocks the run. To break out of a stale-baseline
+  loop, pass `--force-fresh-baseline` to `stet eval rules`; the flag ignores
+  the frozen snapshot and runs the baseline arm fresh against the current
+  harness surface.
 
 ### Run
 

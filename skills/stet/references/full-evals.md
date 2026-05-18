@@ -103,7 +103,10 @@ stet eval report --out .stet/eval-output --json
 dispatch is shuffled by default with a generated seed recorded in
 `manifest.json`. Use `--task-order-seed <seed>`, or suite manifest
 `eval.task_order_seed`, when you need a named replay seed; task-selection
-evidence stays sorted for comparison and replay.
+evidence stays sorted for comparison and replay. Prefer suite manifest
+`eval.workers`, `eval.model_workers`, `eval.harbor_concurrency`, and
+`eval.harness_cli_cache` for stable throttling/cache policy; use matching CLI
+flags only for one-off overrides.
 
 For Docker Desktop hosts, do not raise all concurrency knobs together. Use:
 
@@ -120,7 +123,7 @@ Machine-readable default:
 - Use persisted `eval_report.v1.json` when present, or
   `stet eval report --json` when it must be generated, for the interpreted
   Trial Result.
-- Read `decision_receipt` for the decision and next action, then
+- Read `decision_receipt` for the recommendation (verdict) and next action, then
   `trial_context` for task corpus, task selection, Harness Surface, Search
   Space, baseline/candidate, supporting evidence, freshness, and machine
   recommendation.
@@ -172,6 +175,11 @@ stet eval status --change-manifest .stet/rules/stet.change.yaml --json
 stet eval report --change-manifest .stet/rules/stet.change.yaml --json
 ```
 
+For rules-backed launches, put durable reproducibility knobs in the suite
+manifest under `eval:` (`task_order_seed`, `workers`, `model_workers`,
+`harbor_concurrency`, `harness_cli_cache`). The same `stet eval rules` CLI
+flags override suite values for a temporary launch.
+
 ## Rules
 
 - Repo onboarding starts with agent-selected repo tests plus an authored
@@ -180,6 +188,11 @@ stet eval report --change-manifest .stet/rules/stet.change.yaml --json
   `stet suite build`, not a full `stet eval run`.
 - `stet eval smoke` is the canonical quick first-run wrapper.
 - `stet eval run` is the canonical public home for multi-model H2H execution.
+- `stet eval run` accepts repeatable `--grader <id|bundle|rubric.yaml>` with
+  the same explicit-wins-merge semantics as `stet eval compare` and
+  `stet runs regrade-graders`: omitting `--grader` preserves prior repo
+  quality-config behavior; supplying `--grader` overrides the repo config for
+  this run.
 - Fresh `stet eval run` performs one representative smoke pre-pass before
   canonical work; it does not multiply smoke runs by model or reasoning arm.
   Successful smoke artifacts are seeded into the canonical root so smoked tasks

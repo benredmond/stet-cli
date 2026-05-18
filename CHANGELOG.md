@@ -6,6 +6,68 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.4.0] - 2026-05-18
+
+Hardens the correctness of cached evidence with a frozen-baseline harness-surface digest gate, adds a `stet eval rules repair` recovery command for interrupted compares, attaches paired-bootstrap confidence intervals and a headline-uncertainty envelope to compare receipts, and reports impl-vs-test-fixture patch surface composition on `footprint_risk`. The CLI gains `--grader` on `stet eval run`, deterministic `--task-order-seed` propagation through `stet eval rules` and monitor reruns, and judge-noise regrade seeding; replay-validity output surfaces typed gold-failure summaries. Adds a Claude Code hook harness surface so hook treatments are first-class compare variants, a `validation_failure.kind` subtype taxonomy that prevents setup blockers from reading as model no-patch behavior, and Linux ARM64 release assets. Returns `stet eval status` in ~2s on finalized compares, restores `--out` dataset reuse in the `stet eval rules` skill wrapper, and corrects the shipped skill docs around `decision_receipt.recommendation` and the `--grader-ai-cmd` / `--grader-ai-model-id` fallback.
+
+### Added
+- Publish Linux ARM64 (`linux/arm64`, including aarch64 hosts) CLI release assets and support them in install/update ([9866fe4])
+- Accept repeatable `--grader <id|bundle|rubric.yaml>` on `stet eval run` with explicit-wins-merge over repo quality config, mirroring the flag on `stet eval compare` and `stet runs regrade-graders` ([de6c0bc])
+- Add `stet eval rules repair` to reuse validation artifacts and resume an interrupted compare or rerun missing/partial arms; `stet eval rules resume` remains accepted as a compatibility alias ([c64393c])
+- Plumb `--task-order-seed` through `stet eval rules` and the rules `skill` wrapper so dispatch order replays deterministically against a sorted task selection ([f3e9ee5])
+- Honor suite-manifest `eval.task_order_seed` end-to-end through the `stet eval rules` compare path ([6870494])
+- Persist `task_order_seed` in monitor rerun config so `stet monitor` reproduces the original dispatch order ([6e07411])
+- Add a paired-bootstrap post-pass to `stet eval compare` with `--bootstrap-iterations`, `--bootstrap-seed`, `--ci-level`, and `--no-bootstrap`; receipts gain `aggregate.<metric>.uncertainty` blocks (`baseline_ci`, `candidate_ci`, `delta_ci`, `win_loss_tie`, `bootstrap`) and an `Uncertainty:` text section ([3449973])
+- Carry per-metric uncertainty intervals into `decision_receipt`, including `decision_receipt.headline_uncertainty` for the headline metric's CI envelope ([f72da01])
+- Report patch surface composition on `footprint_risk` results with a new `surface_breakdown` block (agent vs gold, `implementation` vs `test_fixture` sides, `test`/`fixture`/`expected_output` subkinds, and `test_fixture_added_share`); per-task summaries expose `footprint_surface_breakdown` ([5c5a181])
+- Add `--seeds N` to `stet runs regrade-graders` so the operator can bound judge-noise variance during regrades ([ece1165])
+- Add a durable arm identity contract so frozen-baseline reuse and arm-level evidence stay bound to a stable identifier across replays ([5f671b3])
+- Print typed gold-failure summaries (category/reason plus `harbor_log` path and scrubbed excerpt) in replay-validity terminal output so it matches the JSON diagnostic ([a731873])
+- Add a Claude Code hook harness surface — propagate hook-derived signals end-to-end through the rules-runtime artifact, eval-rules check-in, resume, status, runner runtime, and experiment spec so hook treatments are first-class h2h compare variants ([174a94e6])
+- Add a no-patch `validation_failure.kind` subtype taxonomy (`empty_patch`, `setup`, `pre_agent`, `verifier`, `sanitized_patch`); propagate counts through h2h task summaries, reports, eval status, smoke preflight, and run validity; classify Harbor no-agent-start artifacts as setup blockers; prefer invalidating subtypes on smoke-preflight tie-breaks while preserving legacy `matrix_status` values for existing consumers ([4939dd3f])
+
+### Changed
+- Update the shipped Stet skill docs to point at `decision_receipt.recommendation` as the verdict field (mirrored by `lifecycle.decision`); `decision_receipt` has no top-level `decision` field ([d1374a76])
+- Document `--grader-ai-cmd` / `--grader-ai-model-id` as the read-only fixture fallback for LLM-backed graders on `stet eval rules plan` / `launch` / `skill`, and warn that `--no-quality` only drops auto-bundled craft/discipline graders — the default `equivalence` and `code_review` graders remain LLM-backed and still require an evaluator ([d1374a76])
+
+### Fixed
+- Gate frozen-baseline reuse on a `harness_surface.baseline_digest`; cache hits whose surface no longer matches the active harness fall back to `cache_status=unknown` rather than replaying stale evidence ([9776d82])
+- Include the implicit task list in the `stet eval rules` cache key so cache hits/misses match the realized task set ([36ec2c3])
+- Majority-vote non-scored regrade samples when computing aggregate regrade outcomes ([cb77959])
+- Harden replay-validity task identity so per-task gold-replay records bind to a stable identity ([4028f8a])
+- Close arm identity QA gaps surfaced against the durable-identity contract ([c5caca6])
+- Make frozen-baseline trial materialization selective and per-task, preserving trajectory artifacts and avoiding unnecessary copies ([e0d20b9], [f29a6db], [5f0a2fc])
+- Document the new compare bootstrap flags in `stet eval compare --help` ([246ee48])
+- Honor `--out` dataset reuse in the `stet eval rules` skill wrapper by short-circuiting the `rev_range_buildability` preflight when `dataset/build-summary.json` already exists and `--restart` is not set; the reuse decision is logged to stderr so `--plan` does not silently mask a divergent `--rev-range` ([d1374a76])
+- Return `stet eval status` in ~2s on finalized compares by reading the persisted `eval_report.v1.json` sample-adequacy instead of walking `.stet/{eval-rules,leaderboard,archive,baselines}`; the cache binds to the requested compare root and rechecks adequacy inputs for freshness so fail-closed behavior is preserved (STET-387) ([8f439d49])
+
+[v0.4.0]: https://github.com/benredmond/stet/releases/tag/v0.4.0
+[de6c0bc]: https://github.com/benredmond/stet/commit/de6c0bc71f8cd69275e9caa9efa9b442e2de0fb5
+[c64393c]: https://github.com/benredmond/stet/commit/c64393c6
+[f3e9ee5]: https://github.com/benredmond/stet/commit/f3e9ee5f
+[6870494]: https://github.com/benredmond/stet/commit/68704944
+[6e07411]: https://github.com/benredmond/stet/commit/6e07411b
+[3449973]: https://github.com/benredmond/stet/commit/344a9997
+[f72da01]: https://github.com/benredmond/stet/commit/f72da01a
+[5c5a181]: https://github.com/benredmond/stet/commit/5c5a1812
+[ece1165]: https://github.com/benredmond/stet/commit/ece1165e
+[5f671b3]: https://github.com/benredmond/stet/commit/5f671b3c
+[a731873]: https://github.com/benredmond/stet/commit/a7187351
+[9776d82]: https://github.com/benredmond/stet/commit/9776d820
+[36ec2c3]: https://github.com/benredmond/stet/commit/36ec2c3c
+[cb77959]: https://github.com/benredmond/stet/commit/cb77959a
+[4028f8a]: https://github.com/benredmond/stet/commit/4028f8a7
+[c5caca6]: https://github.com/benredmond/stet/commit/c5caca63
+[e0d20b9]: https://github.com/benredmond/stet/commit/e0d20b96
+[f29a6db]: https://github.com/benredmond/stet/commit/f29a6db1
+[5f0a2fc]: https://github.com/benredmond/stet/commit/5f0a2fc7
+[246ee48]: https://github.com/benredmond/stet/commit/246ee48e
+[174a94e6]: https://github.com/benredmond/stet/commit/174a94e6
+[4939dd3f]: https://github.com/benredmond/stet/commit/4939dd3f
+[d1374a76]: https://github.com/benredmond/stet/commit/d1374a76
+[8f439d49]: https://github.com/benredmond/stet/commit/8f439d49
+[9866fe4]: https://github.com/benredmond/stet/commit/9866fe4
+
 ## [v0.3.1] - 2026-05-15
 
 Enrichment runs natively in Go end-to-end; the Python `enrich_dataset.py` scaffolding is gone and prompts ship without XML fences.

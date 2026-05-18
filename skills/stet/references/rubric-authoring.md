@@ -124,6 +124,12 @@ Path preservation rule:
   `--grader discipline`, or `--from-repo-quality` when adding those graders to
   a completed run; the path preservation rule applies only to custom rubric
   YAML files.
+- Use `stet runs regrade-graders --seeds N` when you need a judge-noise bound
+  for additive rubric scores. N greater than 1 records per-task `samples` and
+  run/report-level `sigma_judge`; the default N of 1 keeps the historical
+  single-score output. The same flag can rerun `equivalence` and `code_review`
+  from their stored validation prompts when those built-ins are part of the
+  noise-floor slice.
 
 Task-detail grader context:
 - Custom task-detail graders receive bounded `task_detail.json.grader_context`

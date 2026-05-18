@@ -79,7 +79,7 @@ case "$(uname -m)" in
 esac
 
 case "$os_name/$arch_name" in
-  Darwin/arm64|Darwin/x86_64|Linux/x86_64) ;;
+  Darwin/arm64|Darwin/x86_64|Linux/x86_64|Linux/arm64) ;;
   *) die "unsupported platform: $os_name/$arch_name" ;;
 esac
 

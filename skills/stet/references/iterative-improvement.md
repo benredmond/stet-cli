@@ -71,7 +71,7 @@ If the grader is mushy, split or calibrate the rubric first with
    stop and ask to change the search boundary instead of silently widening it.
 3. Run the baseline eval and record the current Trial Result.
 4. Read persisted `eval_report.v1.json` first. Use `decision_receipt` for
-   decision/confidence/readiness/next action and `trial_context` for task
+   recommendation/confidence/readiness/next action and `trial_context` for task
    corpus, task selection, Harness Surface, Search Space, baseline/candidate,
    supporting evidence, freshness, and machine recommendation.
 5. Inspect lower-level evidence only for diagnosis. Use weakest-risk output,

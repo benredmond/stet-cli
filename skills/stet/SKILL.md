@@ -64,8 +64,12 @@ Canonical read path:
    `stet eval report --out <root> --json` or the matching
    `stet eval report --change-manifest <stet.change.yaml> --json` command to
    locate or materialize it.
-3. Inside the Trial Result, read `decision_receipt` first for decision,
-   confidence, readiness, grader coverage, task issue digests, and next action.
+3. Inside the Trial Result, read `decision_receipt` first for recommendation,
+   confidence, readiness, grader coverage, task issue digests, and next
+   action. The verdict string lives on `decision_receipt.recommendation`
+   (and is mirrored on the top-level `lifecycle.decision` sibling);
+   `decision_receipt` does not
+   carry a top-level `decision` field.
 4. Read top-level `trial_context` next for Task Corpus, task selection,
    Harness Surface, Search Space, baseline, candidate, supporting evidence,
    freshness, and raw machine-recommendation refs.
@@ -156,6 +160,14 @@ Rules for the optimizer:
 - For first-time repo setup, ask once for the quality-grader posture before
   non-interactive init or the first smoke/probe/eval: recommended, standard, or
   custom. See [onboarding](references/onboarding.md).
+- When the suite manifest does not carry an `eval:` stanza (fixture suites,
+  read-only / shared repos, ad-hoc replays), pass `--grader-ai-cmd "<cmd>"
+  --grader-ai-model-id <id>` on `stet eval rules plan` / `launch` / `skill`
+  to supply the independent evaluator for LLM-backed graders (`equivalence`,
+  `code_review`, craft/discipline). Both flags must be set together. Note
+  that `--no-quality` only drops the auto-bundled craft/discipline graders;
+  the default `equivalence` and `code_review` graders remain LLM-backed and
+  still require an evaluator.
 - For compare-backed diagnosis, prefer `decision_receipt.tasks[*]` issue
   summaries, risks, grader coverage, and task flips before opening per-task
   artifacts by hand.
@@ -335,7 +347,7 @@ models, setting up a repo, improving a skill, or checking a release?"
   `stet runs repair-ai-coverage ...`, then `stet runs regrade-graders ...`.
   Add `--parse-retries N` for saved grader prompts that failed parsing.
 - For incomplete rules-backed compares, prefer
-  `stet eval rules resume --change-manifest <stet.change.yaml>` or
+  `stet eval rules repair --change-manifest <stet.change.yaml>` or
   `--rules-root <dir>`. Do not rerun `stet eval rules` to recover partial
   evidence; use `--restart` only when intentionally discarding it.
 - Treat `waiting_on_quota` as an intentional automatic pause. Do not delete

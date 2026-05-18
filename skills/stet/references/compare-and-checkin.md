@@ -77,6 +77,20 @@ Report compare results with baseline/candidate/delta explicitly. The report now
 includes metric narrative lines and a failure taxonomy for all recommendation
 types (promote, hold, inspect), not just inspect.
 
+`stet eval compare` also runs a paired bootstrap post-pass and attaches
+`aggregate.<metric>.uncertainty` blocks (`baseline_ci`, `candidate_ci`,
+`delta_ci`, `win_loss_tie`, `bootstrap`) for `tests_pass_rate`,
+`leaderboard_eligible_pass_rate`, the derived `clean_pass_rate` (tests ∧
+equivalence ∧ code review), equivalence/code-review/footprint grader metrics,
+code-review rubric means, and custom grader metrics when paired values exist.
+Tune with `--bootstrap-iterations N` (default 10000), `--bootstrap-seed N`
+(default 1), `--ci-level F` (default 0.95); pass `--no-bootstrap` to skip the
+pass. CIs are percentile-method, repo-stratified by per-task
+`task_dataset_keys` when present, then task-id prefixes such as `zod/<task>`,
+then the selection `dataset_key` fallback. The receipt prints an
+`Uncertainty:` block with baseline/candidate/Δ ranges and direction-aware W/L/T
+counts; older reports without these fields keep loading unchanged.
+
 Compare task selection is canonical and sorted, while harness dispatch is
 shuffled by default with a generated seed recorded in arm manifests. For
 dataset-backed compares, `--task-order-seed <seed>` overrides that seed for
@@ -95,7 +109,8 @@ sample      24 tasks
 delta       pass +0pp  equiv +7pp  review -2pp  footprint +0.15
 failures    no_patch 0→3  infra 0→0  test_failure 2→1
 driver      candidate wins on equivalence without introducing review regressions;
-            3 candidate tasks produced no patch (bootstrap/setup, not model quality)
+            3 candidate tasks produced no patch (inspect subtypes before
+            calling this model behavior or setup failure)
 evidence    .tmp/stet-compare
 why         Gate is next because the candidate has a bounded win and this is
             where compare evidence becomes a release decision surface.
@@ -151,9 +166,13 @@ then        [s] stop         keep the directional verdict without baseline state
 ```
 
 When the failure taxonomy shows `no_patch` or `infra` counts, surface them in the
-`failures` and `driver` rows. These indicate infrastructure or setup failures, not
-genuine model quality differences — the operator needs to know whether the delta is
-real signal or artifact of broken tasks.
+`failures` and `driver` rows. Inspect `validation_failure.kind` subtypes before
+interpreting the counts: `agent_no_patch`, `patch_capture_empty`,
+`patch_capture_sanitized_empty`, and `unknown_no_patch` are task-level no-patch
+outcomes, while `setup_failed_before_agent`, `agent_never_ran`, and
+`verifier_failed_before_patch_application` are invalidating infra blockers. The
+operator needs to know whether the delta is model/task signal or an artifact of
+broken setup or verification.
 
 The report text now includes for all recommendation types:
 - A comparison table with baseline/candidate/delta columns
@@ -179,6 +198,11 @@ Machine-readable default:
 - Use `decision_receipt.metrics`, `decision_receipt.tasks`, and
   `decision_receipt.compare` instead of reconstructing the answer from
   `experiment.json`, arm summaries, and per-task validation files.
+- When bootstrap ran, `decision_receipt.metrics[*].uncertainty` may include
+  `baseline_ci`, `candidate_ci`, `delta_ci`, `win_loss_tie`, and `bootstrap`.
+  `decision_receipt.headline_uncertainty` repeats the headline metric's CI
+  envelope for quick verdict reading; absence means bootstrap was skipped or no
+  paired uncertainty was available.
 - For LLM-as-a-judge provenance, read `evaluator_model` plus
   `evaluator_model_status` from
   `decision_receipt.tasks[*].{baseline,candidate}_graders.<grader_id>` for the
@@ -198,6 +222,12 @@ Machine-readable default:
   fields before summarizing a winner.
 - Within `decision_receipt.compare`, prefer `failure_taxonomy`,
   `grader_coverage`, and `task_flips` before scraping per-task artifacts.
+- For footprint reads, prefer the `surface_breakdown` block on
+  `footprint_risk` (and the per-task `footprint_surface_breakdown` summary):
+  it splits agent vs gold patches into `implementation` vs `test_fixture`
+  sides with subkind counts (`test`, `fixture`, `expected_output`) and a
+  `test_fixture_added_share`. Use it to explain footprint deltas in terms of
+  what the patch actually touched, not just total churn.
 - Compare automatically includes explicit `--grader` entries plus any
   additional grader that has usable aggregate evidence on both arms. Graders
   present on only one arm, missing on all tasks, or unavailable are excluded
@@ -365,7 +395,7 @@ Use recovery when evidence is incomplete or partially degraded.
 
 Flow-specific recovery actions:
 - `[p] repair`: repair missing quality evidence without full rerun
-- `[c] resume compare`: recover an incomplete rules compare without
+- `[c] repair compare`: recover an incomplete rules compare without
   recomputing completed baseline work; this can rerun a missing or partial
   candidate arm before repairing requested grader coverage
 - `[g] retry grader`: finish retryable artifact-graded task; checks
@@ -377,10 +407,10 @@ Flow-specific recovery actions:
 Recovery rules:
 - If the compare is blocked by invalid or partially valid evidence, explain that
   as a validity problem first, not as a model-quality regression.
-- When grader coverage is partial, prefer `[c] resume compare` or `[g] retry grader`
+- When grader coverage is partial, prefer `[c] repair compare` or `[g] retry grader`
   over a blind full rerun.
-- For rules-backed compares, `[c] resume compare` should start with
-  `stet eval rules resume --change-manifest <stet.change.yaml> --json` or
+- For rules-backed compares, `[c] repair compare` should start with
+  `stet eval rules repair --change-manifest <stet.change.yaml> --json` or
   `--rules-root <dir>` so Stet reuses the persisted runtime and arm artifacts.
 - If an arm is missing tasks or has retryable harness failures, resume reruns
   only those tasks, then rebuilds compare evidence. Do not delete the compare
