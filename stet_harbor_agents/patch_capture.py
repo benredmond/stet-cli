@@ -202,27 +202,140 @@ class AgentPatchCaptureMixin:
         return f"""
 mkdir -p {self._quote(EnvironmentPaths.agent_dir)}
 set +e
+is_denied_relpath() {{
+  case "$1" in
+    AGENTS.md|CLAUDE.md|.git/*|.stet/*|*/.stet/*|node_modules/*|*/node_modules/*|.pnpm-store/*|*/.pnpm-store/*|.yarn/*|*/.yarn/*|dist/*|*/dist/*|build/*|*/build/*|.next/*|*/.next/*|.nuxt/*|*/.nuxt/*|.turbo/*|*/.turbo/*|.cache/*|*/.cache/*|coverage/*|*/coverage/*|.parcel-cache/*|*/.parcel-cache/*|__pycache__/*|*/__pycache__/*|.venv/*|*/.venv/*|venv/*|*/venv/*|.tox/*|*/.tox/*|.mypy_cache/*|*/.mypy_cache/*|.pytest_cache/*|*/.pytest_cache/*|.ruff_cache/*|*/.ruff_cache/*|target/*|*/target/*|.gradle/*|*/.gradle/*|vendor/bundle/*|*/vendor/bundle/*|.bundle/*|*/.bundle/*|tmp/*|*/tmp/*|.tmp/*|*/.tmp/*|*.pyc|*.pyo|*.tsbuildinfo|*.class|*.log|.DS_Store)
+      return 0
+      ;;
+  esac
+  return 1
+}}
+is_lockfile_relpath() {{
+  case "$1" in
+    package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|Cargo.lock|*/Cargo.lock|Gemfile.lock|*/Gemfile.lock|*.lock)
+      return 0
+      ;;
+  esac
+  return 1
+}}
 if git -C {app_dir} rev-parse --verify HEAD >/dev/null 2>&1; then
-  git -C {app_dir} diff --binary --no-color HEAD -- > {patch_path}
+  changed_list=$(mktemp)
+  untracked_list=$(mktemp)
+  path_list=$(mktemp)
+  git -C {app_dir} diff --name-only HEAD -- > "$changed_list"
   status=$?
   if [ "$status" -gt 1 ]; then
+    rm -f "$changed_list" "$untracked_list" "$path_list"
     rm -rf {snapshot_dir}
     exit "$status"
   fi
-
-  untracked_list=$(mktemp)
   git -C {app_dir} ls-files --others --exclude-standard > "$untracked_list"
+  cat "$changed_list" "$untracked_list" > "$path_list"
+  sort -u "$path_list" > "$path_list.sorted"
+  : > {patch_path}
+  source_seen=0
   while IFS= read -r relpath; do
     [ -z "$relpath" ] && continue
+    if is_denied_relpath "$relpath" || is_lockfile_relpath "$relpath"; then
+      continue
+    fi
+    source_seen=1
+    break
+  done < "$path_list.sorted"
+  if [ "$source_seen" -eq 1 ]; then
+    git -C {app_dir} diff --binary --no-color HEAD -- . \
+      ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md' \
+      ':(exclude).stet/**' ':(exclude)**/.stet/**' \
+      ':(exclude).git/**' ':(exclude)**/.git/**' \
+      ':(exclude)node_modules/**' ':(exclude)**/node_modules/**' \
+      ':(exclude)__pycache__/**' ':(exclude)**/__pycache__/**' \
+      ':(exclude)dist/**' ':(exclude)**/dist/**' \
+      ':(exclude)build/**' ':(exclude)**/build/**' \
+      ':(exclude).next/**' ':(exclude)**/.next/**' \
+      ':(exclude).pnpm-store/**' ':(exclude)**/.pnpm-store/**' \
+      ':(exclude).yarn/**' ':(exclude)**/.yarn/**' \
+      ':(exclude).nuxt/**' ':(exclude)**/.nuxt/**' \
+      ':(exclude).turbo/**' ':(exclude)**/.turbo/**' \
+      ':(exclude).cache/**' ':(exclude)**/.cache/**' \
+      ':(exclude)coverage/**' ':(exclude)**/coverage/**' \
+      ':(exclude).parcel-cache/**' ':(exclude)**/.parcel-cache/**' \
+      ':(exclude).venv/**' ':(exclude)**/.venv/**' \
+      ':(exclude)venv/**' ':(exclude)**/venv/**' \
+      ':(exclude).tox/**' ':(exclude)**/.tox/**' \
+      ':(exclude).mypy_cache/**' ':(exclude)**/.mypy_cache/**' \
+      ':(exclude).pytest_cache/**' ':(exclude)**/.pytest_cache/**' \
+      ':(exclude).ruff_cache/**' ':(exclude)**/.ruff_cache/**' \
+      ':(exclude)target/**' ':(exclude)**/target/**' \
+      ':(exclude).gradle/**' ':(exclude)**/.gradle/**' \
+      ':(exclude)vendor/bundle/**' ':(exclude)**/vendor/bundle/**' \
+      ':(exclude).bundle/**' ':(exclude)**/.bundle/**' \
+      ':(exclude).tmp/**' ':(exclude)**/.tmp/**' \
+      ':(exclude)tmp/**' ':(exclude)**/tmp/**' \
+      ':(glob,exclude)**/*.pyc' ':(glob,exclude)**/*.pyo' \
+      ':(glob,exclude)**/*.tsbuildinfo' ':(glob,exclude)**/*.class' \
+      ':(glob,exclude)**/*.log' ':(exclude).DS_Store' ':(exclude)**/.DS_Store' > {patch_path}
+  else
+    git -C {app_dir} diff --binary --no-color HEAD -- . \
+      ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md' \
+      ':(exclude).stet/**' ':(exclude)**/.stet/**' \
+      ':(exclude).git/**' ':(exclude)**/.git/**' \
+      ':(exclude)node_modules/**' ':(exclude)**/node_modules/**' \
+      ':(exclude)__pycache__/**' ':(exclude)**/__pycache__/**' \
+      ':(exclude)dist/**' ':(exclude)**/dist/**' \
+      ':(exclude)build/**' ':(exclude)**/build/**' \
+      ':(exclude).next/**' ':(exclude)**/.next/**' \
+      ':(exclude).pnpm-store/**' ':(exclude)**/.pnpm-store/**' \
+      ':(exclude).yarn/**' ':(exclude)**/.yarn/**' \
+      ':(exclude).nuxt/**' ':(exclude)**/.nuxt/**' \
+      ':(exclude).turbo/**' ':(exclude)**/.turbo/**' \
+      ':(exclude).cache/**' ':(exclude)**/.cache/**' \
+      ':(exclude)coverage/**' ':(exclude)**/coverage/**' \
+      ':(exclude).parcel-cache/**' ':(exclude)**/.parcel-cache/**' \
+      ':(exclude).venv/**' ':(exclude)**/.venv/**' \
+      ':(exclude)venv/**' ':(exclude)**/venv/**' \
+      ':(exclude).tox/**' ':(exclude)**/.tox/**' \
+      ':(exclude).mypy_cache/**' ':(exclude)**/.mypy_cache/**' \
+      ':(exclude).pytest_cache/**' ':(exclude)**/.pytest_cache/**' \
+      ':(exclude).ruff_cache/**' ':(exclude)**/.ruff_cache/**' \
+      ':(exclude)target/**' ':(exclude)**/target/**' \
+      ':(exclude).gradle/**' ':(exclude)**/.gradle/**' \
+      ':(exclude)vendor/bundle/**' ':(exclude)**/vendor/bundle/**' \
+      ':(exclude).bundle/**' ':(exclude)**/.bundle/**' \
+      ':(exclude).tmp/**' ':(exclude)**/.tmp/**' \
+      ':(exclude)tmp/**' ':(exclude)**/tmp/**' \
+      ':(glob,exclude)**/*.pyc' ':(glob,exclude)**/*.pyo' \
+      ':(glob,exclude)**/*.tsbuildinfo' ':(glob,exclude)**/*.class' \
+      ':(glob,exclude)**/*.log' ':(exclude).DS_Store' ':(exclude)**/.DS_Store' \
+      ':(exclude)package-lock.json' ':(exclude)**/package-lock.json' \
+      ':(exclude)pnpm-lock.yaml' ':(exclude)**/pnpm-lock.yaml' \
+      ':(exclude)yarn.lock' ':(exclude)**/yarn.lock' \
+      ':(exclude)Cargo.lock' ':(exclude)**/Cargo.lock' \
+      ':(exclude)Gemfile.lock' ':(exclude)**/Gemfile.lock' \
+      ':(glob,exclude)**/*.lock' ':(exclude)*.lock' > {patch_path}
+  fi
+  status=$?
+  if [ "$status" -gt 1 ]; then
+    rm -f "$changed_list" "$untracked_list" "$path_list" "$path_list.sorted"
+    rm -rf {snapshot_dir}
+    exit "$status"
+  fi
+  while IFS= read -r relpath; do
+    [ -z "$relpath" ] && continue
+    if is_denied_relpath "$relpath"; then
+      continue
+    fi
+    if is_lockfile_relpath "$relpath" && [ "$source_seen" -ne 1 ]; then
+      continue
+    fi
     git -C {app_dir} diff --no-index --binary --no-color -- /dev/null "$relpath" >> {patch_path}
     status=$?
     if [ "$status" -gt 1 ]; then
-      rm -f "$untracked_list"
+      rm -f "$changed_list" "$untracked_list" "$path_list" "$path_list.sorted"
       rm -rf {snapshot_dir}
       exit "$status"
     fi
   done < "$untracked_list"
-  rm -f "$untracked_list"
+  rm -f "$changed_list" "$untracked_list" "$path_list" "$path_list.sorted"
   rm -rf {snapshot_dir}
   exit 0
 fi
@@ -239,22 +352,6 @@ else
 fi
 sort -u "$path_list" > "$path_list.sorted"
 : > {patch_path}
-is_denied_relpath() {{
-  case "$1" in
-    .git/*|.stet/*|*/.stet/*|node_modules/*|*/node_modules/*|.pnpm-store/*|*/.pnpm-store/*|.yarn/*|*/.yarn/*|dist/*|*/dist/*|build/*|*/build/*|.next/*|*/.next/*|.nuxt/*|*/.nuxt/*|.turbo/*|*/.turbo/*|.cache/*|*/.cache/*|coverage/*|*/coverage/*|.parcel-cache/*|*/.parcel-cache/*|__pycache__/*|*/__pycache__/*|.venv/*|*/.venv/*|venv/*|*/venv/*|.tox/*|*/.tox/*|.mypy_cache/*|*/.mypy_cache/*|.pytest_cache/*|*/.pytest_cache/*|.ruff_cache/*|*/.ruff_cache/*|target/*|*/target/*|.gradle/*|*/.gradle/*|vendor/bundle/*|*/vendor/bundle/*|.bundle/*|*/.bundle/*|tmp/*|*/tmp/*|.tmp/*|*/.tmp/*|*.pyc|*.pyo|*.tsbuildinfo|*.class|*.log|.DS_Store)
-      return 0
-      ;;
-  esac
-  return 1
-}}
-is_lockfile_relpath() {{
-  case "$1" in
-    package-lock.json|*/package-lock.json|pnpm-lock.yaml|*/pnpm-lock.yaml|yarn.lock|*/yarn.lock|Cargo.lock|*/Cargo.lock|Gemfile.lock|*/Gemfile.lock|*.lock)
-      return 0
-      ;;
-  esac
-  return 1
-}}
 has_relpath_change() {{
   old_path={snapshot}/"$1"
   new_path={app_dir}/"$1"

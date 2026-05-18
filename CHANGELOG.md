@@ -6,6 +6,16 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [v0.4.1] - 2026-05-18
+
+Prevents Harbor patch capture from retaining harness and gold artifacts as agent output. Operators get cleaner trial results: `.stet/gold.patch`, guidance files, generated directories, and lockfile-only churn no longer leak into captured agent patches, while real source edits and deletions remain visible.
+
+### Fixed
+- Prevent gold patch and other harness-generated paths from leaking into captured agent patches; rewrite legacy Harbor artifact sources to the sanitized canonical patch while preserving real source edits and deletions ([4d68d6a])
+
+[v0.4.1]: https://github.com/benredmond/stet/releases/tag/v0.4.1
+[4d68d6a]: https://github.com/benredmond/stet/commit/4d68d6a75349992f5e2743601f20b76dc1247f81
+
 ## [v0.4.0] - 2026-05-18
 
 Hardens the correctness of cached evidence with a frozen-baseline harness-surface digest gate, adds a `stet eval rules repair` recovery command for interrupted compares, attaches paired-bootstrap confidence intervals and a headline-uncertainty envelope to compare receipts, and reports impl-vs-test-fixture patch surface composition on `footprint_risk`. The CLI gains `--grader` on `stet eval run`, deterministic `--task-order-seed` propagation through `stet eval rules` and monitor reruns, and judge-noise regrade seeding; replay-validity output surfaces typed gold-failure summaries. Adds a Claude Code hook harness surface so hook treatments are first-class compare variants, a `validation_failure.kind` subtype taxonomy that prevents setup blockers from reading as model no-patch behavior, and Linux ARM64 release assets. Returns `stet eval status` in ~2s on finalized compares, restores `--out` dataset reuse in the `stet eval rules` skill wrapper, and corrects the shipped skill docs around `decision_receipt.recommendation` and the `--grader-ai-cmd` / `--grader-ai-model-id` fallback.

@@ -366,6 +366,114 @@ index 5555555..6666666 100644
             self.assertNotIn("node_modules", patch)
             self.assertIn("diff -ruN", patch)
 
+    def test_git_capture_strips_stet_gold_patch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            logs = root / "logs" / "agent"
+            (app / "src").mkdir(parents=True)
+            (app / ".stet").mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (app / "src" / "index.ts").write_text("old\n", encoding="utf-8")
+            (app / "AGENTS.md").write_text("baseline guidance\n", encoding="utf-8")
+
+            subprocess.run(["git", "init", "-q"], cwd=app, check=True)
+            subprocess.run(["git", "config", "user.email", "stet@example.invalid"], cwd=app, check=True)
+            subprocess.run(["git", "config", "user.name", "Stet Test"], cwd=app, check=True)
+            subprocess.run(["git", "add", "src/index.ts", "AGENTS.md"], cwd=app, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "baseline"], cwd=app, check=True)
+
+            (app / "src" / "index.ts").write_text("new\n", encoding="utf-8")
+            (app / "AGENTS.md").write_text("mutated guidance\n", encoding="utf-8")
+            (app / ".stet" / "gold.patch").write_text(
+                "diff --git a/secret b/secret\n",
+                encoding="utf-8",
+            )
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertIn("diff --git a/src/index.ts b/src/index.ts", patch)
+            self.assertNotIn(".stet/gold.patch", patch)
+            self.assertNotIn("AGENTS.md", patch)
+
+    def test_git_capture_preserves_source_deletions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            logs = root / "logs" / "agent"
+            (app / "src").mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (app / "src" / "old.ts").write_text("old\n", encoding="utf-8")
+
+            subprocess.run(["git", "init", "-q"], cwd=app, check=True)
+            subprocess.run(["git", "config", "user.email", "stet@example.invalid"], cwd=app, check=True)
+            subprocess.run(["git", "config", "user.name", "Stet Test"], cwd=app, check=True)
+            subprocess.run(["git", "add", "src/old.ts"], cwd=app, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "baseline"], cwd=app, check=True)
+            subprocess.run(["git", "rm", "-q", "src/old.ts"], cwd=app, check=True)
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertIn("diff --git a/src/old.ts b/src/old.ts", patch)
+            self.assertIn("deleted file mode", patch)
+            self.assertIn("+++ /dev/null", patch)
+
+    def test_git_capture_strips_tracked_denied_paths_and_lockfile_only_patch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            app = root / "app"
+            logs = root / "logs" / "agent"
+            (app / ".venv").mkdir(parents=True)
+            logs.mkdir(parents=True)
+            (app / ".venv" / "cache.py").write_text("old\n", encoding="utf-8")
+            (app / "custom.lock").write_text("old\n", encoding="utf-8")
+
+            subprocess.run(["git", "init", "-q"], cwd=app, check=True)
+            subprocess.run(["git", "config", "user.email", "stet@example.invalid"], cwd=app, check=True)
+            subprocess.run(["git", "config", "user.name", "Stet Test"], cwd=app, check=True)
+            subprocess.run(["git", "add", ".venv/cache.py", "custom.lock"], cwd=app, check=True)
+            subprocess.run(["git", "commit", "-q", "-m", "baseline"], cwd=app, check=True)
+
+            (app / ".venv" / "cache.py").write_text("new\n", encoding="utf-8")
+            (app / "custom.lock").write_text("new\n", encoding="utf-8")
+
+            agent = self.module.ClaudeCodeAuthAgent()
+            agent._APP_DIR = app
+            patch_capture = importlib.import_module("stet_harbor_agents.patch_capture")
+            patch_capture.EnvironmentPaths.agent_dir = logs
+
+            result = subprocess.run(
+                ["/bin/sh", "-c", agent._capture_patch_command()],
+                text=True,
+                capture_output=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stderr)
+            patch = (logs / "agent.patch").read_text(encoding="utf-8")
+            self.assertEqual("", patch)
+
     def test_snapshot_fallback_honors_custom_gitignore_for_new_files(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
