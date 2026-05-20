@@ -13,4 +13,4 @@ The Stet binary (distributed as release assets in this repository) is proprietar
 
 The binary is provided "as is" without warranty of any kind. Stet is not liable for any damages arising from its use.
 
-For licensing questions, contact ben@benr.build.
+For licensing questions, contact ben@stet.sh.
