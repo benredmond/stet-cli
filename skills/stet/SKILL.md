@@ -182,9 +182,9 @@ Rules for the optimizer:
   `decision_metrics.graders` before issuing a verdict. Explicitly requested
   grader coverage that is missing or asymmetric should fail closed to
   `inspect`; one-sided graders are coverage evidence, not comparison math.
-- For installed MVP binaries, use the private dist repo update flow:
+- For installed MVP binaries, use the private CLI repo update flow:
   `stet --version`, `stet update`, or `stet update --version <tag>`. Pilot
-  users need access to `benredmond/stet-dist`, not the private source repo.
+  users need access to `benredmond/stet-cli`.
   `stet update` refreshes both the binary and local Harbor support agents.
 - Harbor-installed Codex/Claude support agents are baked into
   `.stet/harbor.Dockerfile` (`ARG BAKE_CLAUDE_CODE` / `ARG BAKE_CODEX`, both
@@ -204,10 +204,10 @@ Rules for the optimizer:
   Harbor support agent automatically injects the transient Codex provider
   config; keep independent graders on `--grader-ai-cmd` so codex-lb does not
   judge itself.
-- For the shipped Stet agent skill, use the same private dist repo:
-  `npx skills add git@github.com:benredmond/stet-dist.git --skill stet`.
-  Release automation syncs `skills/stet` into
-  `distribution/stet-dist/skills/stet` before publishing dist collateral.
+- For the shipped Stet agent skill, use the same private CLI repo:
+  `npx skills add git@github.com:benredmond/stet-cli.git --skill stet`.
+  Release automation syncs `skills/stet` into the distribution skill snapshot
+  before publishing dist collateral.
 - On command failure, read status when possible, fail closed, and use the
   recovery patterns in [operator-contract](references/operator-contract.md).
 
@@ -222,13 +222,35 @@ Human receipts:
   treat them as the primary agent API. See
   [operator-contract](references/operator-contract.md).
 
+Result interpretation:
+  The agent owns interpretation. A completed eval, failed eval, inspect-state
+  eval, or check-in is not finished until the agent has read the relevant JSON
+  evidence and translated it into an operator-facing judgment.
+
+  Do not respond with only report paths, HTML paths, commands to run, or raw
+  status output. First answer the operator's question with the verdict,
+  confidence, lifecycle/readiness state, decisive metric deltas, evidence
+  quality, effective grader coverage, main risks, and one recommended next
+  action. Surface JSON/HTML paths only as supporting evidence.
+
+  For active runs, read status JSON and explain liveness, phase, progress,
+  blockers, latest artifact, and whether wait, inspect, resume, or repair is
+  next. For completed or inspect-state runs, read or materialize the Trial
+  Result, then read `decision_receipt`, `trial_context`, `quality`, `validity`,
+  `evidence_quality`, `lifecycle`, and `arms` before summarizing.
+
+  If status and persisted evidence disagree, do not stop at the first payload.
+  Follow `evidence_refs`, the rules runtime, and any persisted
+  `eval_report.v1.json` / compare report, then explain the contradiction and
+  fail closed to inspect when the evidence remains degraded.
+
 HTML report:
   Every persisted `eval_report.v1.json` has a sibling `eval_report.v1.html` -
   a self-contained page the operator can open in a browser for a visual
   breakdown of the verdict, metrics, evidence quality, and per-task results.
-  After any completed eval flow, surface the HTML path to the operator so they
-  can review the results visually. The HTML file lives in the same directory as
-  the JSON artifact.
+  After interpreting any completed eval flow, surface the HTML path as
+  supporting evidence so the operator can review the results visually. The HTML
+  file lives in the same directory as the JSON artifact.
 
 ## Route by Intent
 

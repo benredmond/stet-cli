@@ -16,6 +16,13 @@ this file defines how to project that machine contract back to a human operator.
 Use Trial Results and status JSON for machine consumption. Use terminal
 receipts to summarize the result in one scan for the operator.
 
+The agent owns interpretation. A completed run, failed run, inspect-state run,
+or check-in is not finished until the agent has read the relevant JSON,
+extracted the decision/status data, and translated it into an operator-facing
+judgment. Do not respond with only paths, commands, report links, or raw status
+output; use those as evidence links after the verdict, evidence quality,
+effective grader coverage, risks, and next action.
+
 If the persisted `eval_report.v1.json` for the flow already exists, reuse it.
 Ordinary output roots commonly persist it at
 `<root>/.stet/eval-report/eval_report.v1.json`; change-manifest rules flows
@@ -40,6 +47,11 @@ Authority tiers:
 Do not reconstruct a verdict from `experiment.json`, `summary.json`, pass-rate
 heuristics, or task files unless you are explicitly inspecting supporting
 evidence or handling an old root without a persisted Trial Result.
+
+If status and persisted evidence disagree, do not stop at the first payload.
+Follow `evidence_refs`, the rules runtime, and any persisted
+`eval_report.v1.json` / compare report, then explain the contradiction and fail
+closed to inspect when the evidence remains degraded.
 
 ## Core Agent Loop
 

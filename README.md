@@ -1,38 +1,59 @@
 # Stet CLI
 
-Stet is change control for AI coding behavior. It replays real repo work and scores the output so you can safely ship model, config, and skill changes.
+Stet is change control for AI coding behavior. It replays real work from your
+repo and scores the output so you can decide whether a model, instruction file,
+skill, or tool-policy change is safe to keep.
 
-> **Stet is an agent-first tool.** It is designed to be driven by a coding agent (Claude Code, Cursor, Codex, etc.), not run by a human at the terminal. The fastest way to install and use Stet is to **point your agent at this README** and let it run the setup, onboarding, and evals for you.
-
-> **Reading this yourself?** See [`ONBOARDING.md`](ONBOARDING.md) for a short, human-readable explainer of what Stet is doing under the hood — task selection, replay, and grading.
+Stet is designed to be operated by your coding agent. Give these docs to Claude
+Code, Codex, Cursor, or the agent you use day to day, then ask it to run the
+setup and first repo onboarding for you.
 
 Stet is installed in two parts:
 
 - the `stet` CLI, which runs evaluations and manages artifacts
-- the Stet agent skill, which teaches your agent which Stet workflow to use and how to interpret the evidence
+- the Stet agent skill, which teaches your agent which workflow to use and how
+  to read the evidence
 
-For agent-driven use, install both. The CLI gives the agent the tool; the skill gives it the operating contract required to use Stet correctly.
+For beta use, install both. The CLI gives the agent the tool; the skill gives it
+the operating contract.
+
+## Start here
+
+- New beta user: [BETA_QUICKSTART.md](BETA_QUICKSTART.md)
+- Prompt examples: [PROMPT_COOKBOOK.md](PROMPT_COOKBOOK.md)
+- How Stet works: [ONBOARDING.md](ONBOARDING.md)
+- Problems during setup or a run: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 
 ## What you can ask your agent
 
-Once the CLI and the `stet` skill are installed, you can drive evaluations in natural language. A few examples:
+Once the CLI and the `stet` skill are installed, you can drive Stet in natural
+language. For example:
 
-- "Is Opus 4.6 or 4.7 better on my codebase, and on which dimensions?" — runs a head-to-head across replayed tasks and reports per-dimension deltas (correctness, code review, footprint, equivalence).
-- "Make my `CLAUDE.md` better." — proposes edits, then evaluates the new version against the current one on real tasks before recommending the change.
-- "Does this skill actually help? If so, make it better." — A/B tests the skill on/off, then iterates on the skill and re-evaluates until it wins.
-- "Has my agent's performance regressed since last week?" — reruns the frozen baseline and flags per-dimension regressions.
-- "Which of my skills are pulling their weight, and which should I delete?" — evaluates each skill's marginal contribution across the corpus.
-- "Score this PR's diff against our quality rubric before I merge." — runs the evaluator on a single change as a pre-merge gate.
+- "Use the Stet skill to onboard this repo for Stet evals."
+- "Use the Stet skill to check whether this `AGENTS.md` change is helping."
+- "Use the Stet skill to compare these two models on my repo and tell me which
+  one I should use."
+- "Use the Stet skill to test whether this skill actually improves agent
+  behavior."
+- "Use the Stet skill to check the current Stet run and tell me whether it is running, stalled,
+  repairable, or complete."
+- "Use the Stet skill, and before recommending promotion, verify the evidence is
+  decision-grade."
 
-The agent picks the right Stet surface (quick probe, full eval, baseline rerun) based on the question. See `skills/stet/SKILL.md` for the full contract.
+Your agent should choose the right Stet surface for the question. Quick probes
+are useful for cheap directional reads. Manifest-backed rules runs are the
+default for rollout decisions about `AGENTS.md`, `CLAUDE.md`, shared skills,
+model changes, or harness policy.
 
 ## Requirements
 
-- macOS or Linux (x86\_64 or arm64)
-- [GitHub CLI](https://cli.github.com/) authenticated with access to this repo
-- Node.js / `npx` for installing the Stet agent skill
-- Docker ([Desktop](https://www.docker.com/products/docker-desktop/) on macOS, [Engine](https://docs.docker.com/engine/install/) on Linux)
+- macOS or Linux, x86_64 or arm64
+- Access to the beta CLI repo, `benredmond/stet-cli`
+- [GitHub CLI](https://cli.github.com/) authenticated with that access
+- Node.js and `npx` for installing the Stet agent skill
+- Docker, either Docker Desktop on macOS or Docker Engine on Linux
 - Python 3.12+
+- A model-provider auth path for the agent you plan to evaluate
 
 ## Setup
 
@@ -45,6 +66,8 @@ gh repo view benredmond/stet-cli --json visibility,url
 
 ### 2. Install the Stet CLI
 
+The beta installer and release assets live in `benredmond/stet-cli`.
+
 ```sh
 gh api repos/benredmond/stet-cli/contents/install.sh --header "Accept: application/vnd.github.raw" | sh
 ```
@@ -55,7 +78,8 @@ Install a specific version:
 gh api repos/benredmond/stet-cli/contents/install.sh --header "Accept: application/vnd.github.raw" | sh -s -- --version v0.1.0
 ```
 
-The default install directory is `$HOME/.local/bin`. To use a different directory:
+The default install directory is `$HOME/.local/bin`. To use a different
+directory:
 
 ```sh
 gh api repos/benredmond/stet-cli/contents/install.sh --header "Accept: application/vnd.github.raw" | sh -s -- --bin-dir "$HOME/bin"
@@ -67,33 +91,38 @@ Verify:
 stet --version
 ```
 
-### 3. Install the Stet agent skill
+### 3. Sign in to Stet
 
-This is a first-class part of setup, not an optional add-on. Agents need the skill to route questions to the right Stet surface, preserve decision semantics, read canonical artifacts, and avoid treating directional checks as rollout evidence.
+Commercial beta workflows require local Stet auth before eval execution starts.
+
+```sh
+stet auth login
+stet auth status
+```
+
+### 4. Install the Stet agent skill
+
+This is a first-class part of setup. Agents need the skill to route questions to
+the right Stet workflow, preserve decision semantics, read canonical artifacts,
+and avoid treating directional checks as rollout evidence.
 
 ```sh
 npx skills add git@github.com:benredmond/stet-cli.git --skill stet
 ```
 
-To inspect the skill before installing:
+To inspect the available skills before installing:
 
 ```sh
 npx skills add git@github.com:benredmond/stet-cli.git --list
 ```
 
-If your environment has HTTPS git credentials configured for GitHub, the shorthand also works:
-
-```sh
-npx skills add benredmond/stet-cli --skill stet
-```
-
-If your agent supports separate project-level and global skill installs, prefer the install scope that the agent will actually load during Stet work. Verify the skill is visible before running evaluations:
+Verify the skill is visible to the agent you will use for Stet work:
 
 ```sh
 npx skills list
 ```
 
-### 4. Install Docker
+### 5. Install Docker
 
 Check whether Docker is already running:
 
@@ -121,13 +150,14 @@ sudo apt-get update
 sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
-To run Docker without `sudo`, add yourself to the `docker` group and start a new login shell:
+To run Docker without `sudo`, add yourself to the `docker` group and start a new
+login shell:
 
 ```sh
 sudo usermod -aG docker "$USER"
 ```
 
-### 5. Install Harbor
+### 6. Install Harbor
 
 Harbor is Stet's default harness. It requires Python 3.12+ and Docker.
 
@@ -137,17 +167,10 @@ uv tool install harbor
 harbor --version
 ```
 
-If `harbor` is not found after install, add the `uv` tool bin directory to `PATH` (usually `$HOME/.local/bin`).
+If `harbor` is not found after install, add the `uv` tool bin directory to
+`PATH`, usually `$HOME/.local/bin`.
 
-### 6. Final check
-
-```sh
-gh auth status
-stet --version
-npx skills list
-docker info
-harbor --version
-```
+### 7. Set up model-provider auth
 
 If you plan to run Claude Code models, authenticate before running Stet:
 
@@ -166,32 +189,41 @@ in `.zshrc`, `.zprofile`, repo `.env` files, or committed config. For one-off
 automation where a file is not appropriate, scope the variable to the command:
 `CLAUDE_CODE_OAUTH_TOKEN=<token> stet ...`.
 
-Stet also accepts `CLAUDE_CODE_CREDENTIALS_JSON_B64`, `CLAUDE_CODE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`, or `ANTHROPIC_AUTH_TOKEN`. Stet does not read Claude credentials from the macOS Keychain by default. If Claude is selected and none are present, Stet fails before launching the run.
+Stet also accepts `CLAUDE_CODE_CREDENTIALS_JSON_B64`,
+`CLAUDE_CODE_CREDENTIALS_JSON`, `ANTHROPIC_API_KEY`, or
+`ANTHROPIC_AUTH_TOKEN`. Stet does not read Claude credentials from the macOS
+Keychain by default. If Claude is selected and none are present, Stet fails
+before launching the run.
 
-## Getting started: onboard your repo
+### 8. Final setup check
 
-Once the CLI and skill are installed, ask your agent to onboard the repo. The `stet` skill knows the full onboarding flow — reading CI to pick the real test command, authoring the Harbor environment, mining a candidate pool from merged PRs, and building a starter dataset.
-
-In your agent, invoke the skill directly:
-
+```sh
+gh auth status
+stet --version
+stet auth status
+npx skills list
+docker info
+harbor --version
 ```
-/stet onboard my repo
+
+## First prompt
+
+In the repo you want to onboard, ask your agent:
+
+```text
+Use the Stet skill. Onboard this repo for Stet evals. Read CI first, choose the real test command, create the Harbor setup, build a starter dataset, and stop with a receipt before launching expensive evals.
 ```
 
-Or just ask in plain language — the skill is triggered by phrases like "onboard this repo", "set up evals", or "build a dataset":
+Your agent should:
 
-```
-Onboard my repo for Stet evals.
-```
+1. Read CI and build files to choose the real repo-level test command.
+2. Author `.stet/harbor.Dockerfile` and `.stet/stet.harness.yaml`.
+3. Run `stet init`, `stet suite discover`, and `stet suite build`.
+4. Return an onboarding receipt with the candidate-task funnel, selected starter
+   slice, confidence, and recommended next step.
 
-Your agent will:
-
-1. Read the repo's CI workflow and pick the real repo-level test command.
-2. Author `.stet/harbor.Dockerfile` and `.stet/stet.harness.yaml` for this repo.
-3. Run `stet init`, `stet suite discover`, and `stet suite build` to mine real merged PRs into a replayable task corpus.
-4. Return an onboarding receipt with a suggested starter slice so you can run your first probe or model comparison.
-
-After onboarding, drive evals in natural language — see [What you can ask your agent](#what-you-can-ask-your-agent) above for examples.
+After that, use [PROMPT_COOKBOOK.md](PROMPT_COOKBOOK.md) to run a first smoke,
+probe, model comparison, instruction rollout, or skill evaluation.
 
 ## Update and roll back
 
@@ -201,24 +233,34 @@ stet update --prerelease           # latest release candidate
 stet update --version v0.1.0       # pin or roll back
 ```
 
-`stet update` verifies checksums and refreshes local Harbor support agents. Updates are pull-based only; Stet does not auto-update.
+`stet update` verifies checksums and refreshes local Harbor support agents.
+Updates are pull-based only. Stet does not auto-update.
 
 ## Troubleshooting
 
-**`stet` not found after install** — add the install directory to `PATH`.
+Start with [TROUBLESHOOTING.md](TROUBLESHOOTING.md). The fastest checks are:
 
-**GitHub auth or access errors** — run `gh auth status` and verify repo access with `gh repo view benredmond/stet-cli`.
+```sh
+gh auth status
+stet auth status
+docker info
+harbor --version
+```
 
-**Docker unavailable** — start Docker Desktop on macOS or the Docker service on Linux, then rerun `docker info`.
+If a rules run is already in progress or has partial evidence, check status
+before relaunching:
 
-**Harbor not found** — add the `uv` tool bin directory to `PATH` and rerun `harbor --version`.
+```sh
+stet eval status --change-manifest .stet/rules/stet.change.yaml --json
+```
 
-**Claude auth failures** — run `claude setup-token`, store the printed token in `~/.config/stet/claude-oauth-token` with `0600` permissions, and rerun Stet. Use command-scoped `CLAUDE_CODE_OAUTH_TOKEN=<token> stet ...` only for one-off automation.
-
-**No stable release found** — install a prerelease: `stet update --prerelease` or `stet update --version v0.1.0-rc.3`.
+Use repair for incomplete rules evidence. Use `--restart` only when you
+intentionally want to discard existing evidence.
 
 ## License
 
-The install script and agent skill files in this repository are licensed under the [MIT License](LICENSE).
+The install script and agent skill files in this repository are licensed under
+the [MIT License](LICENSE).
 
-The Stet binary distributed via release assets is proprietary software. Use of the binary is governed by the [Stet Binary Terms](TERMS.md).
+The Stet binary distributed via release assets is proprietary software. Use of
+the binary is governed by the [Stet Binary Terms](TERMS.md).
